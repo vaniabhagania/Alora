@@ -1,6 +1,6 @@
 // ALORA Chat — Edge Function
 //
-// Runs server-side so the Anthropic API key never reaches the browser bundle
+// Runs server-side so the OpenAI API key never reaches the browser bundle
 // (see the "AI & Privacy" note in Settings, which promised exactly this).
 //
 // Responsibilities:
@@ -15,16 +15,15 @@
 //    topics, etc. — the "one brain"), the user's own custom instructions
 //    (Settings → Customize Alora), and a small sample of the user's own past
 //    messages so replies can loosely mirror how they naturally write.
-// 4. Call Claude, persist both sides of the exchange into chat_conversations
+// 4. Call OpenAI, persist both sides of the exchange into chat_conversations
 //    / chat_messages (unified memory), log an activity event, and return the
 //    reply.
 //
 // Deploy: supabase functions deploy alora-chat
 // Secret (set by the project owner, never by this code):
-//   supabase secrets set ANTHROPIC_API_KEY=sk-ant-...
+//   supabase secrets set OPENAI_API_KEY=sk-...
 
 import { createClient } from 'npm:@supabase/supabase-js@2';
-import Anthropic from 'npm:@anthropic-ai/sdk';
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -164,9 +163,9 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
+    const apiKey = Deno.env.get('OPENAI_API_KEY');
     if (!apiKey) {
-      return json({ error: 'ANTHROPIC_API_KEY is not configured for this project' }, 500);
+      return json({ error: 'OPENAI_API_KEY is not configured for this project' }, 500);
     }
 
     // ---- Gather personalization: custom instructions + the user's own voice ----
@@ -188,20 +187,32 @@ Deno.serve(async (req: Request) => {
       systemPrompt += `\n\n## Mirroring their voice\nHere are things this user has written in their own words. Notice their natural tone, phrasing, formality, and energy, and let your replies loosely echo that register — stay recognizably ALORA, just don't sound like a generic assistant to them.\n${styleSample.map((s) => `- ${s.slice(0, 200)}`).join('\n')}`;
     }
 
-    const anthropic = new Anthropic({ apiKey });
-    const anthropicMessages = messages
+    const openaiMessages = messages
       .filter((m) => m.role === 'user' || m.role === 'assistant')
       .map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content }));
 
-    const response = await anthropic.messages.create({
-      model: 'claude-opus-5',
-      max_tokens: 1024,
-      system: systemPrompt,
-      messages: anthropicMessages,
-      output_config: { effort: 'low' },
+    const openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        max_tokens: 1024,
+        messages: [{ role: 'system', content: systemPrompt }, ...openaiMessages],
+      }),
     });
 
-    if (response.stop_reason === 'refusal') {
+    if (!openaiRes.ok) {
+      const errBody = await openaiRes.text();
+      throw new Error(`OpenAI API error (${openaiRes.status}): ${errBody}`);
+    }
+
+    const completion = await openaiRes.json();
+    const choice = completion.choices?.[0];
+
+    if (choice?.finish_reason === 'content_filter') {
       return json({
         message: "I don't have a good answer for that one. Let's try a different angle — what's actually on your mind?",
         insights: [],
@@ -210,11 +221,7 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    const assistantText = response.content
-      .filter((b): b is Anthropic.TextBlock => b.type === 'text')
-      .map((b) => b.text)
-      .join('\n')
-      .trim() || "I'm here. Could you say that another way?";
+    const assistantText = (choice?.message?.content as string | undefined)?.trim() || "I'm here. Could you say that another way?";
 
     // ---- Persist the exchange (unified memory) ----
     let conversationId: string | null = null;

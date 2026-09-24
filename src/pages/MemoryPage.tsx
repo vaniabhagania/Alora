@@ -57,8 +57,8 @@ export function MemoryPage() {
   }
 
   // Relevance-ranked search (debounced) instead of a plain substring match,
-  // using aiProvider.searchMemories — the same interface Claude will use
-  // once connected, so search quality improves automatically then.
+  // using aiProvider.searchMemories — the same interface the real LLM will
+  // use once connected, so search quality improves automatically then.
   useEffect(() => {
     if (!search.trim()) { setSearchResultIds(null); return; }
     setSearching(true);
