@@ -55,7 +55,7 @@ export function AuthPage() {
         <div className="mb-8 text-center">
           <div
             className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl animate-pulse-glow"
-            style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent-secondary))' }}
+            style={{ background: 'var(--accent)', border: '2px solid var(--accent-secondary)' }}
           >
             <Sparkles size={32} className="text-white" />
           </div>

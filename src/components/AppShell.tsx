@@ -2,6 +2,7 @@ import { useState, type ReactNode } from 'react';
 import { NAV_ITEMS } from '@/lib/nav';
 import { useAuth } from '@/lib/auth';
 import { useWorlds } from '@/lib/worlds';
+import { useSettings } from '@/lib/settingsContext';
 import { LogOut, Sparkles, Globe } from 'lucide-react';
 
 interface AppShellProps {
@@ -13,9 +14,15 @@ interface AppShellProps {
 export function AppShell({ currentPage, onNavigate, children }: AppShellProps) {
   const { profile, signOut } = useAuth();
   const { activeWorld } = useWorlds();
+  const { hiddenNavItems } = useSettings();
   const [collapsed, setCollapsed] = useState(false);
 
   const displayName = profile?.display_name || 'there';
+  // 'home' and 'settings' always stay visible — a hidden nav item can't leave
+  // the user with no way back into Settings to unhide it.
+  const visibleNavItems = NAV_ITEMS.filter(
+    (item) => item.id === 'home' || item.id === 'settings' || !hiddenNavItems.includes(item.id)
+  );
 
   return (
     <div className="flex h-screen overflow-hidden">
@@ -35,7 +42,7 @@ export function AppShell({ currentPage, onNavigate, children }: AppShellProps) {
         <div className="flex items-center gap-3 px-5 py-6">
           <div
             className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl"
-            style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent-secondary))' }}
+            style={{ background: 'var(--accent)', border: '2px solid var(--accent-secondary)' }}
           >
             <Sparkles size={20} className="text-white" />
           </div>
@@ -48,7 +55,7 @@ export function AppShell({ currentPage, onNavigate, children }: AppShellProps) {
         </div>
 
         <nav className="flex-1 overflow-y-auto px-3 py-2">
-          {NAV_ITEMS.map((item) => {
+          {visibleNavItems.map((item) => {
             const Icon = item.icon;
             const active = currentPage === item.id;
             return (
@@ -135,7 +142,7 @@ export function AppShell({ currentPage, onNavigate, children }: AppShellProps) {
 
       {/* Mobile bottom nav */}
       <nav className="fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around border-t border-black/10 bg-[var(--bg-secondary)]/90 backdrop-blur-xl md:hidden">
-        {NAV_ITEMS.slice(0, 5).map((item) => {
+        {visibleNavItems.slice(0, 5).map((item) => {
           const Icon = item.icon;
           const active = currentPage === item.id;
           return (
@@ -155,7 +162,7 @@ export function AppShell({ currentPage, onNavigate, children }: AppShellProps) {
 
       {/* Mobile "more" nav — accessible via a second row */}
       <div className="fixed bottom-0 left-0 right-0 z-40 flex items-center justify-around border-t border-black/8 bg-[var(--bg-secondary)]/95 backdrop-blur-xl md:hidden" style={{ bottom: '56px', display: currentPage === 'more' ? 'flex' : 'none' }}>
-        {NAV_ITEMS.slice(5).map((item) => {
+        {visibleNavItems.slice(5).map((item) => {
           const Icon = item.icon;
           const active = currentPage === item.id;
           return (

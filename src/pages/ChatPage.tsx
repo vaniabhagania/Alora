@@ -1,15 +1,19 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useAuth } from '@/lib/auth';
+import { useSettings } from '@/lib/settingsContext';
 import { aiProvider } from '@/lib/ai/provider';
 import type { ChatMessage, ChatContext } from '@/lib/ai/types';
 import { getStudentContext } from '@/lib/brain';
-import { Send, Sparkles } from 'lucide-react';
+import { detectNavIntent, type NavIntent } from '@/lib/nav';
+import { Send, Sparkles, LayoutGrid, X } from 'lucide-react';
 
 export function ChatPage() {
   const { profile } = useAuth();
+  const { hiddenNavItems, toggleNavItem } = useSettings();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [thinking, setThinking] = useState(false);
+  const [navSuggestion, setNavSuggestion] = useState<NavIntent | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Sourced from the unified brain (src/lib/brain) rather than ad hoc
@@ -64,6 +68,16 @@ export function ChatPage() {
     setInput('');
     setThinking(true);
 
+    const intent = detectNavIntent(userMsg.content);
+    if (intent) {
+      const alreadyApplied = intent.action === 'hide'
+        ? hiddenNavItems.includes(intent.item.id)
+        : !hiddenNavItems.includes(intent.item.id);
+      setNavSuggestion(alreadyApplied ? null : intent);
+    } else {
+      setNavSuggestion(null);
+    }
+
     try {
       const context = await loadContext();
       const allMessages = [...messages, userMsg];
@@ -73,6 +87,17 @@ export function ChatPage() {
       setMessages((prev) => [...prev, { role: 'assistant', content: 'Something went wrong. Please try again.', timestamp: new Date().toISOString() }]);
     }
     setThinking(false);
+  }
+
+  async function applyNavSuggestion() {
+    if (!navSuggestion) return;
+    await toggleNavItem(navSuggestion.item.id, navSuggestion.action === 'show');
+    setMessages((prev) => [...prev, {
+      role: 'assistant',
+      content: `Done — ${navSuggestion.action === 'hide' ? 'hid' : 'brought back'} "${navSuggestion.item.label}" ${navSuggestion.action === 'hide' ? 'from' : 'in'} your sidebar. Change it anytime in Settings.`,
+      timestamp: new Date().toISOString(),
+    }]);
+    setNavSuggestion(null);
   }
 
   const suggestions = [
@@ -86,7 +111,7 @@ export function ChatPage() {
     <div className="flex h-full flex-col">
       <div className="border-b border-black/8 px-4 py-4 md:px-8">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent-secondary))' }}>
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ background: 'var(--accent)', border: '2px solid var(--accent-secondary)' }}>
             <Sparkles size={20} className="text-white" />
           </div>
           <div>
@@ -132,6 +157,23 @@ export function ChatPage() {
           )}
         </div>
       </div>
+
+      {navSuggestion && (
+        <div className="mx-auto w-full max-w-3xl px-4 pb-2 md:px-8">
+          <div className="glass-card-flat flex items-center gap-3 p-3">
+            <LayoutGrid size={16} className="shrink-0 text-[var(--accent-secondary)]" />
+            <p className="flex-1 text-sm text-[var(--text-primary)]">
+              {navSuggestion.action === 'hide' ? 'Hide' : 'Show'} "{navSuggestion.item.label}" in your sidebar?
+            </p>
+            <button onClick={applyNavSuggestion} className="btn-primary px-3 py-1.5 text-xs">
+              {navSuggestion.action === 'hide' ? 'Hide it' : 'Bring it back'}
+            </button>
+            <button onClick={() => setNavSuggestion(null)} className="rounded-lg p-1.5 text-[var(--text-secondary)] hover:bg-black/5">
+              <X size={14} />
+            </button>
+          </div>
+        </div>
+      )}
 
       {messages.length <= 1 && (
         <div className="mx-auto max-w-3xl px-4 pb-2 md:px-8">

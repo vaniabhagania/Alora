@@ -75,7 +75,7 @@ export function WorldsPage({ onNavigate }: WorldsPageProps) {
           onClick={() => setCreateModal(true)}
           className="group flex items-center gap-2.5 rounded-full border border-black/10 bg-black/[0.03] px-6 py-3 text-sm font-medium text-[var(--text-primary)] transition-all hover:border-[var(--accent)]/30 hover:bg-[var(--accent)]/10"
         >
-          <div className="flex h-6 w-6 items-center justify-center rounded-full" style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent-secondary))' }}>
+          <div className="flex h-6 w-6 items-center justify-center rounded-full" style={{ background: 'var(--accent)' }}>
             <Plus size={14} className="text-white" />
           </div>
           Create New World

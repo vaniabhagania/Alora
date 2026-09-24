@@ -354,6 +354,7 @@ export interface Settings {
   active_theme_id: string | null;
   ai_provider: string;
   custom_chat_instructions: string;
+  hidden_nav_items: string[];
   notifications_enabled: boolean;
   created_at: string;
   updated_at: string;

@@ -2,12 +2,15 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '@/lib/auth';
 import { useToast } from '@/lib/toast';
 import { useWorlds } from '@/lib/worlds';
+import { useSettings } from '@/lib/settingsContext';
 import { supabase } from '@/lib/supabase';
-import { Globe, User, Bell, Brain, Download, Shield, LogOut, ArrowRight } from 'lucide-react';
+import { NAV_ITEMS } from '@/lib/nav';
+import { Globe, User, Bell, Brain, Download, Shield, LogOut, ArrowRight, LayoutGrid } from 'lucide-react';
 
 export function SettingsPage() {
   const { profile, refreshProfile, signOut } = useAuth();
   const { activeWorld, worlds } = useWorlds();
+  const { hiddenNavItems, toggleNavItem } = useSettings();
   const toast = useToast();
   const [displayName, setDisplayName] = useState(profile?.display_name || '');
   const [phase, setPhase] = useState(profile?.current_phase || '');
@@ -96,6 +99,30 @@ export function SettingsPage() {
         <button onClick={() => window.dispatchEvent(new CustomEvent('alora-navigate', { detail: 'worlds' }))} className="flex items-center gap-2 rounded-xl border border-black/10 px-4 py-2 text-sm font-medium text-[var(--text-primary)] transition-colors hover:bg-black/5">
           Open Vibe <ArrowRight size={16} />
         </button>
+      </section>
+
+      <section className="glass-card mb-4 p-5">
+        <div className="mb-4 flex items-center gap-3"><LayoutGrid size={18} className="text-[var(--accent-secondary)]" /><h2 className="font-display font-semibold text-[var(--text-primary)]">Customize Navigation</h2></div>
+        <p className="mb-4 text-sm text-[var(--text-secondary)]">Show only the tabs you actually use. Home and Settings always stay visible. You can also just tell Alora Chat which tabs to hide or bring back.</p>
+        <div className="space-y-1">
+          {NAV_ITEMS.filter((item) => item.id !== 'home' && item.id !== 'settings').map((item) => {
+            const Icon = item.icon;
+            const visible = !hiddenNavItems.includes(item.id);
+            return (
+              <label key={item.id} className="flex items-center justify-between rounded-xl px-2 py-2 hover:bg-black/[0.02]">
+                <span className="flex items-center gap-2.5 text-sm text-[var(--text-primary)]">
+                  <Icon size={16} className="text-[var(--text-secondary)]" /> {item.label}
+                </span>
+                <button
+                  onClick={() => toggleNavItem(item.id, !visible)}
+                  className={`relative h-6 w-11 rounded-full transition-colors ${visible ? 'bg-[var(--accent)]' : 'bg-black/10'}`}
+                >
+                  <span className={`absolute top-1 h-4 w-4 rounded-full bg-white transition-transform ${visible ? 'left-6' : 'left-1'}`} />
+                </button>
+              </label>
+            );
+          })}
+        </div>
       </section>
 
       <section className="glass-card mb-4 p-5">

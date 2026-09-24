@@ -107,7 +107,7 @@ export function NovelPage() {
               <div key={project.id} className="glass-card mb-4 overflow-hidden">
                 <div className="group flex cursor-pointer items-center gap-3 p-4 hover:bg-black/[0.02]" onClick={() => { toggle(project.id); setSelectedProject(project.id); }}>
                   {isExpanded ? <ChevronDown size={18} className="text-[var(--text-secondary)]" /> : <ChevronRight size={18} className="text-[var(--text-secondary)]" />}
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent-secondary))' }}>
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ background: 'var(--accent)', border: '2px solid var(--accent-secondary)' }}>
                     <BookA size={20} className="text-white" />
                   </div>
                   <div className="flex-1">
