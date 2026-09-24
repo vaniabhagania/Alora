@@ -9,7 +9,7 @@ import type { AIReflection } from '@/lib/ai/types';
 import { Modal, ConfirmModal } from '@/components/Modal';
 import { EmptyState, Skeleton } from '@/components/ui';
 import { AttachmentList } from '@/components/AttachmentList';
-import { Plus, BookOpen, Trash2, BookMarked, Smile, Calendar, Sparkles } from 'lucide-react';
+import { Plus, BookOpen, Trash2, BookMarked, Smile, Calendar, Sparkles, Pencil } from 'lucide-react';
 
 const MOODS = ['great', 'good', 'okay', 'low', 'rough'];
 const CATEGORIES = ['reflection', 'idea', 'experience', 'lesson', 'growth', 'academic', 'personal'];
@@ -20,6 +20,7 @@ export function JournalPage() {
   const [loading, setLoading] = useState(true);
   const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [createModal, setCreateModal] = useState(false);
+  const [editModal, setEditModal] = useState<JournalEntry | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [reflecting, setReflecting] = useState(false);
   const [reflection, setReflection] = useState<AIReflection | null>(null);
@@ -144,9 +145,14 @@ export function JournalPage() {
                   )}
                   <span className="rounded-full bg-ink/5 px-2 py-0.5 text-xs capitalize text-[var(--text-secondary)]">{entry.category}</span>
                 </div>
-                <button onClick={() => setDeleteTarget(entry.id)} className="rounded-lg p-1.5 text-[var(--text-secondary)] opacity-0 transition-opacity hover:bg-rose-500/10 hover:text-rose-400 group-hover:opacity-100">
-                  <Trash2 size={16} />
-                </button>
+                <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+                  <button onClick={() => setEditModal(entry)} className="rounded-lg p-1.5 text-[var(--text-secondary)] hover:bg-ink/5 hover:text-[var(--text-primary)]">
+                    <Pencil size={16} />
+                  </button>
+                  <button onClick={() => setDeleteTarget(entry.id)} className="rounded-lg p-1.5 text-[var(--text-secondary)] hover:bg-rose-500/10 hover:text-rose-400">
+                    <Trash2 size={16} />
+                  </button>
+                </div>
               </div>
               <p className="whitespace-pre-wrap text-sm leading-relaxed text-[var(--text-primary)]">{entry.content}</p>
               {entry.tags.length > 0 && (
@@ -173,37 +179,44 @@ export function JournalPage() {
         <CreateEntryModal onClose={() => setCreateModal(false)} onCreated={() => { setCreateModal(false); loadEntries(); }} />
       )}
 
+      {editModal && (
+        <CreateEntryModal entry={editModal} onClose={() => setEditModal(null)} onCreated={() => { setEditModal(null); loadEntries(); }} />
+      )}
+
       <ConfirmModal open={!!deleteTarget} onClose={() => setDeleteTarget(null)} onConfirm={handleDelete} title="Delete Entry" message="Are you sure you want to delete this journal entry? This cannot be undone." confirmLabel="Delete" danger />
     </div>
   );
 }
 
-function CreateEntryModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
+function CreateEntryModal({ entry, onClose, onCreated }: { entry?: JournalEntry; onClose: () => void; onCreated: () => void }) {
   const toast = useToast();
-  const [content, setContent] = useState('');
-  const [mood, setMood] = useState('');
-  const [category, setCategory] = useState('reflection');
-  const [tags, setTags] = useState('');
-  const [novelEligible, setNovelEligible] = useState(true);
+  const [content, setContent] = useState(entry?.content || '');
+  const [mood, setMood] = useState(entry?.mood || '');
+  const [category, setCategory] = useState(entry?.category || 'reflection');
+  const [tags, setTags] = useState(entry?.tags?.join(', ') || '');
+  const [novelEligible, setNovelEligible] = useState(entry?.is_novel_eligible ?? true);
   const [saving, setSaving] = useState(false);
 
   async function handleCreate() {
     if (!content.trim()) { toast.show('Please write something.', 'error'); return; }
     setSaving(true);
-    const { error } = await supabase.from('journal_entries').insert({
+    const payload = {
       content,
       mood: mood || null,
       category,
       tags: tags ? tags.split(',').map((t) => t.trim()).filter(Boolean) : [],
       is_novel_eligible: novelEligible,
-    });
+    };
+    const { error } = entry
+      ? await supabase.from('journal_entries').update(payload).eq('id', entry.id)
+      : await supabase.from('journal_entries').insert(payload);
     setSaving(false);
     if (error) { toast.show('Failed to save entry.', 'error'); }
-    else { toast.show('Entry saved.'); onCreated(); }
+    else { toast.show(entry ? 'Entry updated.' : 'Entry saved.'); onCreated(); }
   }
 
   return (
-    <Modal open={true} onClose={onClose} title="New Journal Entry" maxWidth="600px">
+    <Modal open={true} onClose={onClose} title={entry ? 'Edit Journal Entry' : 'New Journal Entry'} maxWidth="600px">
       <div className="space-y-4">
         <div>
           <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Your thoughts</label>
@@ -234,7 +247,7 @@ function CreateEntryModal({ onClose, onCreated }: { onClose: () => void; onCreat
         </label>
         <div className="flex justify-end gap-3">
           <button onClick={onClose} className="rounded-xl px-4 py-2 text-sm font-medium text-[var(--text-secondary)] hover:bg-ink/5">Cancel</button>
-          <button onClick={handleCreate} disabled={saving} className="btn-primary px-5 py-2 text-sm">{saving ? 'Saving...' : 'Save Entry'}</button>
+          <button onClick={handleCreate} disabled={saving} className="btn-primary px-5 py-2 text-sm">{saving ? 'Saving...' : entry ? 'Save' : 'Save Entry'}</button>
         </div>
       </div>
     </Modal>

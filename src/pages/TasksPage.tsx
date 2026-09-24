@@ -6,7 +6,7 @@ import type { Task } from '@/lib/types';
 import { cascadeTaskCompletion, cascadeTaskCreation } from '@/lib/brain/cascade';
 import { Modal, ConfirmModal } from '@/components/Modal';
 import { EmptyState, Skeleton } from '@/components/ui';
-import { Plus, CheckCircle2, Circle, Clock, Trash2, Flag } from 'lucide-react';
+import { Plus, CheckCircle2, Circle, Clock, Trash2, Flag, Pencil } from 'lucide-react';
 
 type View = 'today' | 'week' | 'upcoming' | 'no_date' | 'overdue' | 'completed';
 
@@ -17,6 +17,7 @@ export function TasksPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [view, setView] = useState<View>('today');
   const [createModal, setCreateModal] = useState(false);
+  const [editModal, setEditModal] = useState<Task | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
 
   const loadTasks = useCallback(async () => {
@@ -158,16 +159,25 @@ export function TasksPage() {
                   {task.category && <span className="text-xs text-[var(--text-secondary)]">{task.category}</span>}
                 </div>
               </div>
-              <button onClick={() => setDeleteTarget(task.id)} className="shrink-0 rounded-lg p-1.5 text-[var(--text-secondary)] opacity-0 transition-opacity hover:bg-rose-500/10 hover:text-rose-400 group-hover:opacity-100">
-                <Trash2 size={16} />
-              </button>
+              <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+                <button onClick={() => setEditModal(task)} className="rounded-lg p-1.5 text-[var(--text-secondary)] hover:bg-ink/5 hover:text-[var(--text-primary)]">
+                  <Pencil size={16} />
+                </button>
+                <button onClick={() => setDeleteTarget(task.id)} className="rounded-lg p-1.5 text-[var(--text-secondary)] hover:bg-rose-500/10 hover:text-rose-400">
+                  <Trash2 size={16} />
+                </button>
+              </div>
             </div>
           ))}
         </div>
       )}
 
       {createModal && (
-        <CreateTaskModal onClose={() => setCreateModal(false)} onCreated={() => { setCreateModal(false); loadTasks(); }} />
+        <TaskModal onClose={() => setCreateModal(false)} onSaved={() => { setCreateModal(false); loadTasks(); }} />
+      )}
+
+      {editModal && (
+        <TaskModal task={editModal} onClose={() => setEditModal(null)} onSaved={() => { setEditModal(null); loadTasks(); }} />
       )}
 
       <ConfirmModal open={!!deleteTarget} onClose={() => setDeleteTarget(null)} onConfirm={handleDelete} title="Delete Task" message="Are you sure you want to delete this task?" confirmLabel="Delete" danger />
@@ -175,36 +185,52 @@ export function TasksPage() {
   );
 }
 
-function CreateTaskModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
+function toDatetimeLocal(iso: string | null): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function TaskModal({ task, onClose, onSaved }: { task?: Task; onClose: () => void; onSaved: () => void }) {
   const toast = useToast();
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [priority, setPriority] = useState('medium');
-  const [category, setCategory] = useState('academic');
-  const [deadline, setDeadline] = useState('');
-  const [estimatedEffort, setEstimatedEffort] = useState('');
+  const [title, setTitle] = useState(task?.title || '');
+  const [description, setDescription] = useState(task?.description || '');
+  const [priority, setPriority] = useState(task?.priority || 'medium');
+  const [category, setCategory] = useState(task?.category || 'academic');
+  const [deadline, setDeadline] = useState(toDatetimeLocal(task?.deadline || null));
+  const [estimatedEffort, setEstimatedEffort] = useState(task?.estimated_effort || '');
   const [saving, setSaving] = useState(false);
 
-  async function handleCreate() {
+  async function handleSave() {
     if (!title.trim()) { toast.show('Please enter a title.', 'error'); return; }
     setSaving(true);
-    const { data, error } = await supabase.from('tasks').insert({
+    const payload = {
       title,
       description,
       priority,
       category,
       deadline: deadline ? new Date(deadline).toISOString() : null,
       estimated_effort: estimatedEffort,
-    }).select('*').maybeSingle();
+    };
+    if (task) {
+      const { error } = await supabase.from('tasks').update(payload).eq('id', task.id);
+      setSaving(false);
+      if (error) { toast.show('Failed to save task.', 'error'); return; }
+      toast.show('Task updated.');
+      onSaved();
+      return;
+    }
+    const { data, error } = await supabase.from('tasks').insert(payload).select('*').maybeSingle();
     setSaving(false);
     if (error) { toast.show('Failed to create task.', 'error'); return; }
     if (data) await cascadeTaskCreation(data as Task);
     toast.show('Task created.');
-    onCreated();
+    onSaved();
   }
 
   return (
-    <Modal open={true} onClose={onClose} title="New Task" maxWidth="500px">
+    <Modal open={true} onClose={onClose} title={task ? 'Edit Task' : 'New Task'} maxWidth="500px">
       <div className="space-y-4">
         <div>
           <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Title</label>
@@ -246,7 +272,7 @@ function CreateTaskModal({ onClose, onCreated }: { onClose: () => void; onCreate
         </div>
         <div className="flex justify-end gap-3">
           <button onClick={onClose} className="rounded-xl px-4 py-2 text-sm font-medium text-[var(--text-secondary)] hover:bg-ink/5">Cancel</button>
-          <button onClick={handleCreate} disabled={saving} className="btn-primary px-5 py-2 text-sm">{saving ? 'Creating...' : 'Create'}</button>
+          <button onClick={handleSave} disabled={saving} className="btn-primary px-5 py-2 text-sm">{saving ? 'Saving...' : task ? 'Save' : 'Create'}</button>
         </div>
       </div>
     </Modal>

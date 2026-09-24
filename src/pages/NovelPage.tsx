@@ -7,7 +7,7 @@ import type { NovelProject, NovelChapter, NovelScene, JournalEntry } from '@/lib
 import type { AINovelCuration } from '@/lib/ai/types';
 import { Modal, ConfirmModal } from '@/components/Modal';
 import { EmptyState, Skeleton } from '@/components/ui';
-import { Plus, BookA, Trash2, ChevronRight, ChevronDown, BookMarked, Sparkles, FileText } from 'lucide-react';
+import { Plus, BookA, Trash2, ChevronRight, ChevronDown, BookMarked, Sparkles, FileText, Pencil } from 'lucide-react';
 
 export function NovelPage() {
   const { profile } = useAuth();
@@ -20,6 +20,9 @@ export function NovelPage() {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [selectedProject, setSelectedProject] = useState<string | null>(null);
   const [createModal, setCreateModal] = useState<'project' | 'chapter' | 'scene' | null>(null);
+  const [editModal, setEditModal] = useState<
+    { type: 'project'; data: NovelProject } | { type: 'chapter'; data: NovelChapter } | { type: 'scene'; data: NovelScene } | null
+  >(null);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; type: 'project' | 'chapter' | 'scene'; label: string } | null>(null);
 
   const loadData = useCallback(async () => {
@@ -114,6 +117,7 @@ export function NovelPage() {
                     <h3 className="font-display font-semibold text-[var(--text-primary)]">{project.title}</h3>
                     <p className="text-xs text-[var(--text-secondary)]">{projectChapters.length} chapters · {project.themes.length} themes</p>
                   </div>
+                  <button onClick={(e) => { e.stopPropagation(); setEditModal({ type: 'project', data: project }); }} className="rounded-lg p-1.5 text-[var(--text-secondary)] opacity-0 hover:bg-ink/5 hover:text-[var(--text-primary)] group-hover:opacity-100"><Pencil size={16} /></button>
                   <button onClick={(e) => { e.stopPropagation(); setDeleteTarget({ id: project.id, type: 'project', label: project.title }); }} className="rounded-lg p-1.5 text-[var(--text-secondary)] opacity-0 hover:bg-rose-500/10 hover:text-rose-400 group-hover:opacity-100"><Trash2 size={16} /></button>
                 </div>
 
@@ -136,6 +140,7 @@ export function NovelPage() {
                                 <p className="text-xs text-[var(--text-secondary)]">{chapterScenes.length} scenes · {chapter.status}</p>
                               </div>
                               <button onClick={(e) => { e.stopPropagation(); setCreateModal('scene'); }} className="rounded-lg p-1.5 text-[var(--text-secondary)] opacity-0 hover:bg-ink/5 hover:text-[var(--text-primary)] group-hover:opacity-100"><Plus size={14} /></button>
+                              <button onClick={(e) => { e.stopPropagation(); setEditModal({ type: 'chapter', data: chapter }); }} className="rounded-lg p-1.5 text-[var(--text-secondary)] opacity-0 hover:bg-ink/5 hover:text-[var(--text-primary)] group-hover:opacity-100"><Pencil size={14} /></button>
                               <button onClick={(e) => { e.stopPropagation(); setDeleteTarget({ id: chapter.id, type: 'chapter', label: chapter.title }); }} className="rounded-lg p-1.5 text-[var(--text-secondary)] opacity-0 hover:bg-rose-500/10 hover:text-rose-400 group-hover:opacity-100"><Trash2 size={14} /></button>
                             </div>
                             {chExpanded && (
@@ -147,7 +152,10 @@ export function NovelPage() {
                                     <div key={scene.id} className="group px-4 py-3">
                                       <div className="flex items-center justify-between">
                                         <p className="text-sm text-[var(--text-primary)]">{scene.title}</p>
-                                        <button onClick={() => setDeleteTarget({ id: scene.id, type: 'scene', label: scene.title })} className="rounded-lg p-1 text-[var(--text-secondary)] opacity-0 hover:bg-rose-500/10 hover:text-rose-400 group-hover:opacity-100"><Trash2 size={12} /></button>
+                                        <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100">
+                                          <button onClick={() => setEditModal({ type: 'scene', data: scene })} className="rounded-lg p-1 text-[var(--text-secondary)] hover:bg-ink/5 hover:text-[var(--text-primary)]"><Pencil size={12} /></button>
+                                          <button onClick={() => setDeleteTarget({ id: scene.id, type: 'scene', label: scene.title })} className="rounded-lg p-1 text-[var(--text-secondary)] hover:bg-rose-500/10 hover:text-rose-400"><Trash2 size={12} /></button>
+                                        </div>
                                       </div>
                                       {scene.raw_content && <p className="mt-1 rounded-lg border border-ink/8 bg-ink/[0.02] px-3 py-2 text-xs text-[var(--text-secondary)]">{scene.raw_content}</p>}
                                       {scene.curated_content && (
@@ -181,13 +189,23 @@ export function NovelPage() {
       )}
 
       {createModal === 'project' && (
-        <CreateProjectModal onClose={() => setCreateModal(null)} onCreated={() => { setCreateModal(null); loadData(); }} />
+        <ProjectModal onClose={() => setCreateModal(null)} onSaved={() => { setCreateModal(null); loadData(); }} />
       )}
       {createModal === 'chapter' && (
-        <CreateChapterModal projects={projects} onClose={() => setCreateModal(null)} onCreated={() => { setCreateModal(null); loadData(); }} />
+        <ChapterModal projects={projects} onClose={() => setCreateModal(null)} onSaved={() => { setCreateModal(null); loadData(); }} />
       )}
       {createModal === 'scene' && (
-        <CreateSceneModal chapters={chapters} journalEntries={journalEntries} onClose={() => setCreateModal(null)} onCreated={() => { setCreateModal(null); loadData(); }} />
+        <SceneModal chapters={chapters} journalEntries={journalEntries} onClose={() => setCreateModal(null)} onSaved={() => { setCreateModal(null); loadData(); }} />
+      )}
+
+      {editModal?.type === 'project' && (
+        <ProjectModal project={editModal.data} onClose={() => setEditModal(null)} onSaved={() => { setEditModal(null); loadData(); }} />
+      )}
+      {editModal?.type === 'chapter' && (
+        <ChapterModal projects={projects} chapter={editModal.data} onClose={() => setEditModal(null)} onSaved={() => { setEditModal(null); loadData(); }} />
+      )}
+      {editModal?.type === 'scene' && (
+        <SceneModal chapters={chapters} journalEntries={journalEntries} scene={editModal.data} onClose={() => setEditModal(null)} onSaved={() => { setEditModal(null); loadData(); }} />
       )}
 
       <ConfirmModal open={!!deleteTarget} onClose={() => setDeleteTarget(null)} onConfirm={handleDelete} title="Delete" message={`Delete "${deleteTarget?.label}"? This cannot be undone.`} confirmLabel="Delete" danger />
@@ -195,27 +213,30 @@ export function NovelPage() {
   );
 }
 
-function CreateProjectModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
+function ProjectModal({ project, onClose, onSaved }: { project?: NovelProject; onClose: () => void; onSaved: () => void }) {
   const toast = useToast();
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [themes, setThemes] = useState('');
+  const [title, setTitle] = useState(project?.title || '');
+  const [description, setDescription] = useState(project?.description || '');
+  const [themes, setThemes] = useState(project?.themes?.join(', ') || '');
   const [saving, setSaving] = useState(false);
 
-  async function handleCreate() {
+  async function handleSave() {
     if (!title.trim()) { toast.show('Please enter a title.', 'error'); return; }
     setSaving(true);
-    const { error } = await supabase.from('novel_projects').insert({
+    const payload = {
       title, description,
       themes: themes ? themes.split(',').map((t) => t.trim()).filter(Boolean) : [],
-    });
+    };
+    const { error } = project
+      ? await supabase.from('novel_projects').update(payload).eq('id', project.id)
+      : await supabase.from('novel_projects').insert(payload);
     setSaving(false);
-    if (error) { toast.show('Failed to create project.', 'error'); }
-    else { toast.show('Novel project created.'); onCreated(); }
+    if (error) { toast.show('Failed to save project.', 'error'); }
+    else { toast.show(project ? 'Project updated.' : 'Novel project created.'); onSaved(); }
   }
 
   return (
-    <Modal open={true} onClose={onClose} title="New Novel Project">
+    <Modal open={true} onClose={onClose} title={project ? 'Edit Novel Project' : 'New Novel Project'}>
       <div className="space-y-4">
         <div>
           <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Title</label>
@@ -231,31 +252,33 @@ function CreateProjectModal({ onClose, onCreated }: { onClose: () => void; onCre
         </div>
         <div className="flex justify-end gap-3">
           <button onClick={onClose} className="rounded-xl px-4 py-2 text-sm font-medium text-[var(--text-secondary)] hover:bg-ink/5">Cancel</button>
-          <button onClick={handleCreate} disabled={saving} className="btn-primary px-5 py-2 text-sm">{saving ? 'Creating...' : 'Create'}</button>
+          <button onClick={handleSave} disabled={saving} className="btn-primary px-5 py-2 text-sm">{saving ? 'Saving...' : project ? 'Save' : 'Create'}</button>
         </div>
       </div>
     </Modal>
   );
 }
 
-function CreateChapterModal({ projects, onClose, onCreated }: { projects: NovelProject[]; onClose: () => void; onCreated: () => void }) {
+function ChapterModal({ projects, chapter, onClose, onSaved }: { projects: NovelProject[]; chapter?: NovelChapter; onClose: () => void; onSaved: () => void }) {
   const toast = useToast();
-  const [title, setTitle] = useState('');
-  const [summary, setSummary] = useState('');
-  const [projectId, setProjectId] = useState(projects[0]?.id || '');
+  const [title, setTitle] = useState(chapter?.title || '');
+  const [summary, setSummary] = useState(chapter?.summary || '');
+  const [projectId, setProjectId] = useState(chapter?.novel_project_id || projects[0]?.id || '');
   const [saving, setSaving] = useState(false);
 
-  async function handleCreate() {
+  async function handleSave() {
     if (!title.trim() || !projectId) { toast.show('Please enter a title and select a project.', 'error'); return; }
     setSaving(true);
-    const { error } = await supabase.from('novel_chapters').insert({ title, summary, novel_project_id: projectId, position: 1 });
+    const { error } = chapter
+      ? await supabase.from('novel_chapters').update({ title, summary, novel_project_id: projectId }).eq('id', chapter.id)
+      : await supabase.from('novel_chapters').insert({ title, summary, novel_project_id: projectId, position: 1 });
     setSaving(false);
-    if (error) { toast.show('Failed to create chapter.', 'error'); }
-    else { toast.show('Chapter created.'); onCreated(); }
+    if (error) { toast.show('Failed to save chapter.', 'error'); }
+    else { toast.show(chapter ? 'Chapter updated.' : 'Chapter created.'); onSaved(); }
   }
 
   return (
-    <Modal open={true} onClose={onClose} title="New Chapter">
+    <Modal open={true} onClose={onClose} title={chapter ? 'Edit Chapter' : 'New Chapter'}>
       <div className="space-y-4">
         <div>
           <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Novel Project</label>
@@ -273,22 +296,22 @@ function CreateChapterModal({ projects, onClose, onCreated }: { projects: NovelP
         </div>
         <div className="flex justify-end gap-3">
           <button onClick={onClose} className="rounded-xl px-4 py-2 text-sm font-medium text-[var(--text-secondary)] hover:bg-ink/5">Cancel</button>
-          <button onClick={handleCreate} disabled={saving} className="btn-primary px-5 py-2 text-sm">{saving ? 'Creating...' : 'Create'}</button>
+          <button onClick={handleSave} disabled={saving} className="btn-primary px-5 py-2 text-sm">{saving ? 'Saving...' : chapter ? 'Save' : 'Create'}</button>
         </div>
       </div>
     </Modal>
   );
 }
 
-function CreateSceneModal({ chapters, journalEntries, onClose, onCreated }: { chapters: NovelChapter[]; journalEntries: JournalEntry[]; onClose: () => void; onCreated: () => void }) {
+function SceneModal({ chapters, journalEntries, scene, onClose, onSaved }: { chapters: NovelChapter[]; journalEntries: JournalEntry[]; scene?: NovelScene; onClose: () => void; onSaved: () => void }) {
   const toast = useToast();
-  const [title, setTitle] = useState('');
-  const [chapterId, setChapterId] = useState(chapters[0]?.id || '');
-  const [rawContent, setRawContent] = useState('');
-  const [sourceMemoryId, setSourceMemoryId] = useState('');
+  const [title, setTitle] = useState(scene?.title || '');
+  const [chapterId, setChapterId] = useState(scene?.chapter_id || chapters[0]?.id || '');
+  const [rawContent, setRawContent] = useState(scene?.raw_content || '');
+  const [sourceMemoryId, setSourceMemoryId] = useState(scene?.source_memory_id || '');
   const [saving, setSaving] = useState(false);
   const [curating, setCurating] = useState(false);
-  const [curation, setCuration] = useState<AINovelCuration | null>(null);
+  const [curation, setCuration] = useState<AINovelCuration | null>(scene?.curated_content ? { curatedContent: scene.curated_content, aiSuggestions: (scene.ai_suggestions as { type: string; content: string }[]) || [] } : null);
 
   async function handleCurate() {
     if (!rawContent.trim()) { toast.show('Write the scene first.', 'error'); return; }
@@ -301,22 +324,25 @@ function CreateSceneModal({ chapters, journalEntries, onClose, onCreated }: { ch
     setCurating(false);
   }
 
-  async function handleCreate() {
+  async function handleSave() {
     if (!title.trim() || !chapterId) { toast.show('Please enter a title and select a chapter.', 'error'); return; }
     setSaving(true);
-    const { error } = await supabase.from('novel_scenes').insert({
+    const payload = {
       title, chapter_id: chapterId, raw_content: rawContent,
       curated_content: curation?.curatedContent || '',
       ai_suggestions: curation?.aiSuggestions || [],
-      source_memory_id: sourceMemoryId || null, position: 1,
-    });
+      source_memory_id: sourceMemoryId || null,
+    };
+    const { error } = scene
+      ? await supabase.from('novel_scenes').update(payload).eq('id', scene.id)
+      : await supabase.from('novel_scenes').insert({ ...payload, position: 1 });
     setSaving(false);
-    if (error) { toast.show('Failed to create scene.', 'error'); }
-    else { toast.show('Scene created.'); onCreated(); }
+    if (error) { toast.show('Failed to save scene.', 'error'); }
+    else { toast.show(scene ? 'Scene updated.' : 'Scene created.'); onSaved(); }
   }
 
   return (
-    <Modal open={true} onClose={onClose} title="New Scene" maxWidth="600px">
+    <Modal open={true} onClose={onClose} title={scene ? 'Edit Scene' : 'New Scene'} maxWidth="600px">
       <div className="space-y-4">
         <div>
           <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Chapter</label>
@@ -362,7 +388,7 @@ function CreateSceneModal({ chapters, journalEntries, onClose, onCreated }: { ch
         )}
         <div className="flex justify-end gap-3">
           <button onClick={onClose} className="rounded-xl px-4 py-2 text-sm font-medium text-[var(--text-secondary)] hover:bg-ink/5">Cancel</button>
-          <button onClick={handleCreate} disabled={saving} className="btn-primary px-5 py-2 text-sm">{saving ? 'Creating...' : 'Create'}</button>
+          <button onClick={handleSave} disabled={saving} className="btn-primary px-5 py-2 text-sm">{saving ? 'Saving...' : scene ? 'Save' : 'Create'}</button>
         </div>
       </div>
     </Modal>
