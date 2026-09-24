@@ -74,7 +74,7 @@ export function NovelPage() {
           <p className="mt-1 text-sm text-[var(--text-secondary)]">Transform your journey into a story. Raw memory preserved; curated story crafted.</p>
         </div>
         {projects.length > 0 && (
-          <button onClick={() => setCreateModal('chapter')} className="flex items-center gap-2 rounded-xl border border-black/10 px-4 py-2 text-sm font-medium text-[var(--text-primary)] hover:bg-black/5">
+          <button onClick={() => setCreateModal('chapter')} className="flex items-center gap-2 rounded-xl border border-ink/10 px-4 py-2 text-sm font-medium text-[var(--text-primary)] hover:bg-ink/5">
             <Plus size={16} /> Add Chapter
           </button>
         )}
@@ -105,7 +105,7 @@ export function NovelPage() {
             const isExpanded = expanded.has(project.id) || selectedProject === project.id;
             return (
               <div key={project.id} className="glass-card mb-4 overflow-hidden">
-                <div className="group flex cursor-pointer items-center gap-3 p-4 hover:bg-black/[0.02]" onClick={() => { toggle(project.id); setSelectedProject(project.id); }}>
+                <div className="group flex cursor-pointer items-center gap-3 p-4 hover:bg-ink/[0.02]" onClick={() => { toggle(project.id); setSelectedProject(project.id); }}>
                   {isExpanded ? <ChevronDown size={18} className="text-[var(--text-secondary)]" /> : <ChevronRight size={18} className="text-[var(--text-secondary)]" />}
                   <div className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ background: 'var(--accent)', border: '2px solid var(--accent-secondary)' }}>
                     <BookA size={20} className="text-white" />
@@ -118,7 +118,7 @@ export function NovelPage() {
                 </div>
 
                 {isExpanded && (
-                  <div className="ml-6 border-l border-black/8 pl-2">
+                  <div className="ml-6 border-l border-ink/8 pl-2">
                     {project.description && <p className="px-4 py-2 text-sm text-[var(--text-secondary)]">{project.description}</p>}
                     {projectChapters.length === 0 ? (
                       <p className="px-4 py-3 text-sm text-[var(--text-secondary)]">No chapters yet. Add your first chapter to start writing.</p>
@@ -128,18 +128,18 @@ export function NovelPage() {
                         const chExpanded = expanded.has(chapter.id);
                         return (
                           <div key={chapter.id}>
-                            <div className="group flex cursor-pointer items-center gap-2 rounded-lg px-4 py-2.5 hover:bg-black/[0.02]" onClick={() => toggle(chapter.id)}>
+                            <div className="group flex cursor-pointer items-center gap-2 rounded-lg px-4 py-2.5 hover:bg-ink/[0.02]" onClick={() => toggle(chapter.id)}>
                               {chExpanded ? <ChevronDown size={14} className="text-[var(--text-secondary)]" /> : <ChevronRight size={14} className="text-[var(--text-secondary)]" />}
                               <FileText size={14} className="text-[var(--text-secondary)]" />
                               <div className="flex-1">
                                 <p className="text-sm font-medium text-[var(--text-primary)]">{chapter.title}</p>
                                 <p className="text-xs text-[var(--text-secondary)]">{chapterScenes.length} scenes · {chapter.status}</p>
                               </div>
-                              <button onClick={(e) => { e.stopPropagation(); setCreateModal('scene'); }} className="rounded-lg p-1.5 text-[var(--text-secondary)] opacity-0 hover:bg-black/5 hover:text-[var(--text-primary)] group-hover:opacity-100"><Plus size={14} /></button>
+                              <button onClick={(e) => { e.stopPropagation(); setCreateModal('scene'); }} className="rounded-lg p-1.5 text-[var(--text-secondary)] opacity-0 hover:bg-ink/5 hover:text-[var(--text-primary)] group-hover:opacity-100"><Plus size={14} /></button>
                               <button onClick={(e) => { e.stopPropagation(); setDeleteTarget({ id: chapter.id, type: 'chapter', label: chapter.title }); }} className="rounded-lg p-1.5 text-[var(--text-secondary)] opacity-0 hover:bg-rose-500/10 hover:text-rose-400 group-hover:opacity-100"><Trash2 size={14} /></button>
                             </div>
                             {chExpanded && (
-                              <div className="ml-4 border-l border-black/8">
+                              <div className="ml-4 border-l border-ink/8">
                                 {chapterScenes.length === 0 ? (
                                   <p className="px-4 py-2 text-sm text-[var(--text-secondary)]">No scenes yet.</p>
                                 ) : (
@@ -149,7 +149,7 @@ export function NovelPage() {
                                         <p className="text-sm text-[var(--text-primary)]">{scene.title}</p>
                                         <button onClick={() => setDeleteTarget({ id: scene.id, type: 'scene', label: scene.title })} className="rounded-lg p-1 text-[var(--text-secondary)] opacity-0 hover:bg-rose-500/10 hover:text-rose-400 group-hover:opacity-100"><Trash2 size={12} /></button>
                                       </div>
-                                      {scene.raw_content && <p className="mt-1 rounded-lg border border-black/8 bg-black/[0.02] px-3 py-2 text-xs text-[var(--text-secondary)]">{scene.raw_content}</p>}
+                                      {scene.raw_content && <p className="mt-1 rounded-lg border border-ink/8 bg-ink/[0.02] px-3 py-2 text-xs text-[var(--text-secondary)]">{scene.raw_content}</p>}
                                       {scene.curated_content && (
                                         <div className="mt-2 rounded-lg border border-[var(--accent)]/10 bg-[var(--accent)]/5 px-3 py-2">
                                           <p className="mb-1 flex items-center gap-1 text-[10px] uppercase tracking-wider text-[var(--accent-secondary)]"><Sparkles size={10} /> Curated Story</p>
@@ -219,18 +219,18 @@ function CreateProjectModal({ onClose, onCreated }: { onClose: () => void; onCre
       <div className="space-y-4">
         <div>
           <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Title</label>
-          <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="My Journey" className="w-full rounded-xl border border-black/10 bg-black/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50" />
+          <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="My Journey" className="w-full rounded-xl border border-ink/10 bg-ink/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50" />
         </div>
         <div>
           <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Description</label>
-          <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="What is this novel about?" rows={2} className="w-full rounded-xl border border-black/10 bg-black/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50" />
+          <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="What is this novel about?" rows={2} className="w-full rounded-xl border border-ink/10 bg-ink/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50" />
         </div>
         <div>
           <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Themes (comma-separated)</label>
-          <input type="text" value={themes} onChange={(e) => setThemes(e.target.value)} placeholder="growth, resilience, ambition" className="w-full rounded-xl border border-black/10 bg-black/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50" />
+          <input type="text" value={themes} onChange={(e) => setThemes(e.target.value)} placeholder="growth, resilience, ambition" className="w-full rounded-xl border border-ink/10 bg-ink/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50" />
         </div>
         <div className="flex justify-end gap-3">
-          <button onClick={onClose} className="rounded-xl px-4 py-2 text-sm font-medium text-[var(--text-secondary)] hover:bg-black/5">Cancel</button>
+          <button onClick={onClose} className="rounded-xl px-4 py-2 text-sm font-medium text-[var(--text-secondary)] hover:bg-ink/5">Cancel</button>
           <button onClick={handleCreate} disabled={saving} className="btn-primary px-5 py-2 text-sm">{saving ? 'Creating...' : 'Create'}</button>
         </div>
       </div>
@@ -259,20 +259,20 @@ function CreateChapterModal({ projects, onClose, onCreated }: { projects: NovelP
       <div className="space-y-4">
         <div>
           <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Novel Project</label>
-          <select value={projectId} onChange={(e) => setProjectId(e.target.value)} className="w-full rounded-xl border border-black/10 bg-black/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] focus:border-[var(--accent)]/50">
+          <select value={projectId} onChange={(e) => setProjectId(e.target.value)} className="w-full rounded-xl border border-ink/10 bg-ink/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] focus:border-[var(--accent)]/50">
             {projects.map((p) => <option key={p.id} value={p.id}>{p.title}</option>)}
           </select>
         </div>
         <div>
           <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Title</label>
-          <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Chapter 1: The Beginning" className="w-full rounded-xl border border-black/10 bg-black/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50" />
+          <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Chapter 1: The Beginning" className="w-full rounded-xl border border-ink/10 bg-ink/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50" />
         </div>
         <div>
           <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Summary</label>
-          <textarea value={summary} onChange={(e) => setSummary(e.target.value)} placeholder="What happens in this chapter?" rows={2} className="w-full rounded-xl border border-black/10 bg-black/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50" />
+          <textarea value={summary} onChange={(e) => setSummary(e.target.value)} placeholder="What happens in this chapter?" rows={2} className="w-full rounded-xl border border-ink/10 bg-ink/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50" />
         </div>
         <div className="flex justify-end gap-3">
-          <button onClick={onClose} className="rounded-xl px-4 py-2 text-sm font-medium text-[var(--text-secondary)] hover:bg-black/5">Cancel</button>
+          <button onClick={onClose} className="rounded-xl px-4 py-2 text-sm font-medium text-[var(--text-secondary)] hover:bg-ink/5">Cancel</button>
           <button onClick={handleCreate} disabled={saving} className="btn-primary px-5 py-2 text-sm">{saving ? 'Creating...' : 'Create'}</button>
         </div>
       </div>
@@ -320,18 +320,18 @@ function CreateSceneModal({ chapters, journalEntries, onClose, onCreated }: { ch
       <div className="space-y-4">
         <div>
           <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Chapter</label>
-          <select value={chapterId} onChange={(e) => setChapterId(e.target.value)} className="w-full rounded-xl border border-black/10 bg-black/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] focus:border-[var(--accent)]/50">
+          <select value={chapterId} onChange={(e) => setChapterId(e.target.value)} className="w-full rounded-xl border border-ink/10 bg-ink/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] focus:border-[var(--accent)]/50">
             {chapters.map((c) => <option key={c.id} value={c.id}>{c.title}</option>)}
           </select>
         </div>
         <div>
           <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Title</label>
-          <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="The first day of class" className="w-full rounded-xl border border-black/10 bg-black/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50" />
+          <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="The first day of class" className="w-full rounded-xl border border-ink/10 bg-ink/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50" />
         </div>
         {journalEntries.length > 0 && (
           <div>
             <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Source Memory (optional)</label>
-            <select value={sourceMemoryId} onChange={(e) => { setSourceMemoryId(e.target.value); const je = journalEntries.find((j) => j.id === e.target.value); if (je) setRawContent(je.content); }} className="w-full rounded-xl border border-black/10 bg-black/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] focus:border-[var(--accent)]/50">
+            <select value={sourceMemoryId} onChange={(e) => { setSourceMemoryId(e.target.value); const je = journalEntries.find((j) => j.id === e.target.value); if (je) setRawContent(je.content); }} className="w-full rounded-xl border border-ink/10 bg-ink/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] focus:border-[var(--accent)]/50">
               <option value="">None</option>
               {journalEntries.map((j) => <option key={j.id} value={j.id}>{new Date(j.created_at).toLocaleDateString()} — {j.content.slice(0, 40)}...</option>)}
             </select>
@@ -339,7 +339,7 @@ function CreateSceneModal({ chapters, journalEntries, onClose, onCreated }: { ch
         )}
         <div>
           <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Raw Content</label>
-          <textarea value={rawContent} onChange={(e) => { setRawContent(e.target.value); setCuration(null); }} placeholder="Write the scene in your own words..." rows={5} className="w-full rounded-xl border border-black/10 bg-black/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50" />
+          <textarea value={rawContent} onChange={(e) => { setRawContent(e.target.value); setCuration(null); }} placeholder="Write the scene in your own words..." rows={5} className="w-full rounded-xl border border-ink/10 bg-ink/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50" />
           <div className="mt-1.5 flex items-center justify-between">
             <p className="text-xs text-[var(--text-secondary)]/60">Raw content is preserved. AI curation is added as a separate layer, clearly marked.</p>
             <button type="button" onClick={handleCurate} disabled={curating || !rawContent.trim()} className="flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium text-[var(--accent-secondary)] hover:bg-[var(--accent)]/10 disabled:opacity-40">
@@ -361,7 +361,7 @@ function CreateSceneModal({ chapters, journalEntries, onClose, onCreated }: { ch
           </div>
         )}
         <div className="flex justify-end gap-3">
-          <button onClick={onClose} className="rounded-xl px-4 py-2 text-sm font-medium text-[var(--text-secondary)] hover:bg-black/5">Cancel</button>
+          <button onClick={onClose} className="rounded-xl px-4 py-2 text-sm font-medium text-[var(--text-secondary)] hover:bg-ink/5">Cancel</button>
           <button onClick={handleCreate} disabled={saving} className="btn-primary px-5 py-2 text-sm">{saving ? 'Creating...' : 'Create'}</button>
         </div>
       </div>

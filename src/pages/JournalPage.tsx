@@ -74,7 +74,7 @@ export function JournalPage() {
         </div>
         <div className="flex items-center gap-2">
           {entries.length >= 3 && (
-            <button onClick={handleReflect} disabled={reflecting} className="flex items-center gap-2 rounded-xl border border-black/10 px-4 py-2 text-sm font-medium text-[var(--text-primary)] hover:bg-black/5 disabled:opacity-50">
+            <button onClick={handleReflect} disabled={reflecting} className="flex items-center gap-2 rounded-xl border border-ink/10 px-4 py-2 text-sm font-medium text-[var(--text-primary)] hover:bg-ink/5 disabled:opacity-50">
               <Sparkles size={16} /> {reflecting ? 'Reflecting...' : 'Reflect'}
             </button>
           )}
@@ -141,7 +141,7 @@ export function JournalPage() {
                       <Smile size={12} /> {entry.mood}
                     </span>
                   )}
-                  <span className="rounded-full bg-black/5 px-2 py-0.5 text-xs capitalize text-[var(--text-secondary)]">{entry.category}</span>
+                  <span className="rounded-full bg-ink/5 px-2 py-0.5 text-xs capitalize text-[var(--text-secondary)]">{entry.category}</span>
                 </div>
                 <button onClick={() => setDeleteTarget(entry.id)} className="rounded-lg p-1.5 text-[var(--text-secondary)] opacity-0 transition-opacity hover:bg-rose-500/10 hover:text-rose-400 group-hover:opacity-100">
                   <Trash2 size={16} />
@@ -203,33 +203,33 @@ function CreateEntryModal({ onClose, onCreated }: { onClose: () => void; onCreat
       <div className="space-y-4">
         <div>
           <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Your thoughts</label>
-          <textarea value={content} onChange={(e) => setContent(e.target.value)} placeholder="What's on your mind? What happened today? What did you learn? What are you feeling?" rows={6} className="w-full rounded-xl border border-black/10 bg-black/[0.03] px-4 py-3 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50" />
+          <textarea value={content} onChange={(e) => setContent(e.target.value)} placeholder="What's on your mind? What happened today? What did you learn? What are you feeling?" rows={6} className="w-full rounded-xl border border-ink/10 bg-ink/[0.03] px-4 py-3 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50" />
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Mood</label>
-            <select value={mood} onChange={(e) => setMood(e.target.value)} className="w-full rounded-xl border border-black/10 bg-black/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] focus:border-[var(--accent)]/50">
+            <select value={mood} onChange={(e) => setMood(e.target.value)} className="w-full rounded-xl border border-ink/10 bg-ink/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] focus:border-[var(--accent)]/50">
               <option value="">None</option>
               {MOODS.map((m) => <option key={m} value={m} className="capitalize">{m}</option>)}
             </select>
           </div>
           <div>
             <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Category</label>
-            <select value={category} onChange={(e) => setCategory(e.target.value)} className="w-full rounded-xl border border-black/10 bg-black/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] focus:border-[var(--accent)]/50">
+            <select value={category} onChange={(e) => setCategory(e.target.value)} className="w-full rounded-xl border border-ink/10 bg-ink/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] focus:border-[var(--accent)]/50">
               {CATEGORIES.map((c) => <option key={c} value={c} className="capitalize">{c}</option>)}
             </select>
           </div>
         </div>
         <div>
           <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Tags (comma-separated)</label>
-          <input type="text" value={tags} onChange={(e) => setTags(e.target.value)} placeholder="growth, statistics, breakthrough" className="w-full rounded-xl border border-black/10 bg-black/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50" />
+          <input type="text" value={tags} onChange={(e) => setTags(e.target.value)} placeholder="growth, statistics, breakthrough" className="w-full rounded-xl border border-ink/10 bg-ink/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50" />
         </div>
         <label className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
           <input type="checkbox" checked={novelEligible} onChange={(e) => setNovelEligible(e.target.checked)} className="accent-[var(--accent)]" />
           Eligible for Novel (ALORA can use this in your future book)
         </label>
         <div className="flex justify-end gap-3">
-          <button onClick={onClose} className="rounded-xl px-4 py-2 text-sm font-medium text-[var(--text-secondary)] hover:bg-black/5">Cancel</button>
+          <button onClick={onClose} className="rounded-xl px-4 py-2 text-sm font-medium text-[var(--text-secondary)] hover:bg-ink/5">Cancel</button>
           <button onClick={handleCreate} disabled={saving} className="btn-primary px-5 py-2 text-sm">{saving ? 'Saving...' : 'Save Entry'}</button>
         </div>
       </div>

@@ -24,6 +24,18 @@ export const DEFAULT_THEME: AppTheme = {
   glowColor: 'rgba(155,138,224,0.18)',
 };
 
+export const DEFAULT_DARK_THEME: AppTheme = {
+  name: 'Soft Bloom (Dark)',
+  bgPrimary: '#201e29',
+  bgSecondary: '#2a2735',
+  accent: '#9b8ae0',
+  accentSecondary: '#f5cf6b',
+  textPrimary: '#f2efe8',
+  textSecondary: '#a39cb0',
+  cardBg: 'rgba(255,255,255,0.045)',
+  glowColor: 'rgba(155,138,224,0.25)',
+};
+
 export const DEFAULT_WORLD_THEME: WorldThemeSettings = {
   background: {
     type: 'solid',
@@ -67,6 +79,34 @@ export const DEFAULT_WORLD_THEME: WorldThemeSettings = {
   },
 };
 
+function hexToRgbTriplet(hex: string): string {
+  const clean = hex.replace('#', '');
+  const full = clean.length === 3 ? clean.split('').map((c) => c + c).join('') : clean;
+  const r = parseInt(full.slice(0, 2), 16) || 0;
+  const g = parseInt(full.slice(2, 4), 16) || 0;
+  const b = parseInt(full.slice(4, 6), 16) || 0;
+  return `${r} ${g} ${b}`;
+}
+
+/**
+ * Derives borders/scrollbars/skeletons/the `ink` Tailwind token from
+ * whatever the theme's text color actually is, instead of hardcoding a
+ * light-mode-only rgba() everywhere. This is what makes dark mode "just
+ * work" for the many `border-ink/10`, `bg-ink/[0.03]` etc. utility classes
+ * across the app — they track contrast automatically.
+ */
+function applyContrastVars(root: HTMLElement, textColor: string) {
+  const rgb = textColor.startsWith('#') ? hexToRgbTriplet(textColor) : '46 42 61';
+  const csv = rgb.replace(/ /g, ',');
+  root.style.setProperty('--ink-rgb', rgb);
+  root.style.setProperty('--border-color', `rgba(${csv},0.10)`);
+  root.style.setProperty('--border-color-hover', `rgba(${csv},0.18)`);
+  root.style.setProperty('--scrollbar-thumb', `rgba(${csv},0.15)`);
+  root.style.setProperty('--scrollbar-thumb-hover', `rgba(${csv},0.25)`);
+  root.style.setProperty('--skeleton-a', `rgba(${csv},0.05)`);
+  root.style.setProperty('--skeleton-b', `rgba(${csv},0.10)`);
+}
+
 export function applyTheme(theme: AppTheme) {
   const root = document.documentElement;
   root.style.setProperty('--bg-primary', theme.bgPrimary);
@@ -77,6 +117,7 @@ export function applyTheme(theme: AppTheme) {
   root.style.setProperty('--text-secondary', theme.textSecondary);
   root.style.setProperty('--card-bg', theme.cardBg);
   root.style.setProperty('--glow', theme.glowColor);
+  applyContrastVars(root, theme.textPrimary);
 }
 
 export function applyWorldTheme(settings: WorldThemeSettings) {
@@ -101,6 +142,7 @@ export function applyWorldTheme(settings: WorldThemeSettings) {
   root.style.setProperty('--text-secondary', settings.colors.textSecondary);
   root.style.setProperty('--card-bg', settings.surfaces.cardBg);
   root.style.setProperty('--glow', `${settings.colors.accent}26`);
+  applyContrastVars(root, settings.colors.textPrimary);
 
   // Extended properties
   root.style.setProperty('--surface-card', settings.surfaces.cardBg);

@@ -81,7 +81,7 @@ export function CourseView({ courseId, data, onBack, reload }: Props) {
 
       <div className="mb-6 flex gap-2 overflow-x-auto pb-1">
         {tabs.map((t) => (
-          <button key={t.id} onClick={() => setTab(t.id)} className={`shrink-0 rounded-xl px-3 py-2 text-sm font-medium transition-colors ${tab === t.id ? 'bg-[var(--accent)]/15 text-[var(--text-primary)]' : 'text-[var(--text-secondary)] hover:bg-black/5'}`}>
+          <button key={t.id} onClick={() => setTab(t.id)} className={`shrink-0 rounded-xl px-3 py-2 text-sm font-medium transition-colors ${tab === t.id ? 'bg-[var(--accent)]/15 text-[var(--text-primary)]' : 'text-[var(--text-secondary)] hover:bg-ink/5'}`}>
             {t.label}
           </button>
         ))}
@@ -113,7 +113,7 @@ export function CourseView({ courseId, data, onBack, reload }: Props) {
             <h3 className="mb-3 font-display font-semibold text-[var(--text-primary)]">Recent Learning</h3>
             {courseClasses.length === 0 ? <p className="text-sm text-[var(--text-secondary)]">No classes logged yet.</p> : (
               <div className="space-y-2">{courseClasses.slice(0, 5).map((c) => { const log = data.classLogs.find((l) => l.class_id === c.id); return (
-                <div key={c.id} className="rounded-lg border border-black/8 bg-black/[0.02] px-3 py-2">
+                <div key={c.id} className="rounded-lg border border-ink/8 bg-ink/[0.02] px-3 py-2">
                   <p className="text-sm text-[var(--text-primary)]">{c.title}</p>
                   <p className="text-xs text-[var(--text-secondary)]">{new Date(c.session_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}{log ? ` · Understanding: ${log.understanding_rating}/5` : ''}</p>
                 </div>
@@ -155,7 +155,7 @@ export function CourseView({ courseId, data, onBack, reload }: Props) {
               <div key={c.id} className="glass-card p-4">
                 <p className="text-sm font-medium text-[var(--text-primary)]">{c.title}</p>
                 <p className="text-xs text-[var(--text-secondary)]">{new Date(c.session_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}{topic ? ` · ${topic.name}` : ''}{log ? ` · Understanding: ${log.understanding_rating}/5` : ''}</p>
-                {log && log.raw_thoughts && <p className="mt-2 rounded-lg border border-black/8 bg-black/[0.02] px-3 py-2 text-xs text-[var(--text-secondary)]">{log.raw_thoughts}</p>}
+                {log && log.raw_thoughts && <p className="mt-2 rounded-lg border border-ink/8 bg-ink/[0.02] px-3 py-2 text-xs text-[var(--text-secondary)]">{log.raw_thoughts}</p>}
               </div>
             );})
           )}
@@ -229,10 +229,10 @@ function TopicRow({ topic, reload }: { topic: Topic; reload: () => Promise<void>
         <button onClick={() => setEditing(!editing)} className="text-xs text-[var(--accent-secondary)] hover:underline">{editing ? 'Cancel' : 'Edit'}</button>
       </div>
       {editing && (
-        <div className="mt-3 space-y-3 border-t border-black/8 pt-3">
+        <div className="mt-3 space-y-3 border-t border-ink/8 pt-3">
           <div>
             <label className="mb-1 block text-xs text-[var(--text-secondary)]">Understanding Status</label>
-            <select value={status} onChange={(e) => setStatus(e.target.value as TopicStatus)} className="w-full rounded-xl border border-black/10 bg-black/[0.03] px-3 py-2 text-sm text-[var(--text-primary)] focus:border-[var(--accent)]/50">
+            <select value={status} onChange={(e) => setStatus(e.target.value as TopicStatus)} className="w-full rounded-xl border border-ink/10 bg-ink/[0.03] px-3 py-2 text-sm text-[var(--text-primary)] focus:border-[var(--accent)]/50">
               {Object.entries(STATUS_LABELS).map(([val, label]) => <option key={val} value={val}>{label}</option>)}
             </select>
           </div>

@@ -1,7 +1,8 @@
 import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth';
-import { applyWorldTheme, applyTheme, DEFAULT_THEME, DEFAULT_WORLD_THEME } from '@/lib/theme';
+import { useSettings } from '@/lib/settingsContext';
+import { applyWorldTheme, applyTheme, DEFAULT_THEME, DEFAULT_DARK_THEME, DEFAULT_WORLD_THEME } from '@/lib/theme';
 import type { World, WorldThemeSettings } from '@/lib/types';
 
 interface WorldContextValue {
@@ -21,6 +22,7 @@ const WorldContext = createContext<WorldContextValue | undefined>(undefined);
 
 export function WorldProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
+  const { themeMode } = useSettings();
   const [worlds, setWorlds] = useState<World[]>([]);
   const [activeWorld, setActiveWorld] = useState<World | null>(null);
   const [loading, setLoading] = useState(true);
@@ -51,9 +53,9 @@ export function WorldProvider({ children }: { children: ReactNode }) {
     if (activeWorld) {
       applyWorldTheme(activeWorld.theme_settings);
     } else {
-      applyTheme(DEFAULT_THEME);
+      applyTheme(themeMode === 'dark' ? DEFAULT_DARK_THEME : DEFAULT_THEME);
     }
-  }, [activeWorld]);
+  }, [activeWorld, themeMode]);
 
   const createWorld = useCallback(async (name: string, description?: string): Promise<string | null> => {
     if (!user) return null;

@@ -19,6 +19,9 @@
   --scrollbar-thumb-hover: rgba(46,42,61,0.25);
   --skeleton-a: rgba(46,42,61,0.05);
   --skeleton-b: rgba(46,42,61,0.10);
+  /* Space-separated so Tailwind's rgb(var(--ink-rgb) / <alpha-value>) can
+     apply an opacity modifier at runtime — see tailwind.config.js. */
+  --ink-rgb: 46 42 61;
 }
 
 * {
@@ -47,8 +50,10 @@ body::after {
   inset: 0;
   z-index: 2;
   pointer-events: none;
-  opacity: 0.035;
-  mix-blend-mode: multiply;
+  opacity: 0.05;
+  /* overlay darkens on light backgrounds and lightens on dark ones, so the
+     texture stays visible in both light and dark mode without switching it. */
+  mix-blend-mode: overlay;
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
