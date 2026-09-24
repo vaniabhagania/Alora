@@ -11,7 +11,7 @@ import {
   Pencil, Archive, ArchiveRestore, ArrowUp, ArrowDown, Sparkles, CheckSquare,
 } from 'lucide-react';
 
-type Level = 'year' | 'semester' | 'course' | 'module' | 'topic';
+export type Level = 'year' | 'semester' | 'course' | 'module' | 'topic';
 
 interface Props {
   data: AcademicData;
@@ -467,7 +467,7 @@ interface EditModalData {
 
 // --- Create entity modal ---
 
-function CreateEntityModal({ level, parentId, parentLabel, data, onClose, onCreated }: {
+export function CreateEntityModal({ level, parentId, parentLabel, data, onClose, onCreated }: {
   level: Level;
   parentId?: string;
   parentLabel?: string;
@@ -655,7 +655,7 @@ function EditEntityModal({ data: editData, allData, onClose, onSaved }: { data: 
 
 // --- Log class modal (preserved from Phase 1) ---
 
-function LogClassModal({ courses, modules, topics, defaultCourseId, onClose, onLogged }: {
+export function LogClassModal({ courses, modules, topics, defaultCourseId, onClose, onLogged }: {
   courses: Course[];
   modules: Module[];
   topics: Topic[];

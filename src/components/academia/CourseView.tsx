@@ -4,7 +4,8 @@ import { useToast } from '@/lib/toast';
 import type { AcademicData } from '@/lib/academic';
 import type { Topic, TopicStatus } from '@/lib/types';
 import { EmptyState, ProgressBar } from '@/components/ui';
-import { ArrowLeft, BookOpen, FileText, Brain, Clock, AlertTriangle, TrendingUp, GraduationCap, CheckCircle2 } from 'lucide-react';
+import { CreateEntityModal, LogClassModal, type Level } from '@/components/academia/AcademiaHierarchy';
+import { ArrowLeft, BookOpen, FileText, Brain, Clock, AlertTriangle, TrendingUp, GraduationCap, CheckCircle2, Plus } from 'lucide-react';
 
 interface Props {
   courseId: string;
@@ -28,6 +29,9 @@ const STATUS_COLORS: Record<TopicStatus, string> = {
 
 export function CourseView({ courseId, data, onBack, reload }: Props) {
   const [tab, setTab] = useState<Tab>('overview');
+  const [createModal, setCreateModal] = useState<{ level: Level; parentId?: string; parentLabel?: string } | null>(null);
+  const [logClassModal, setLogClassModal] = useState(false);
+  const [topicModuleId, setTopicModuleId] = useState('');
 
   const course = data.courses.find((c) => c.id === courseId);
   if (!course) {
@@ -125,7 +129,10 @@ export function CourseView({ courseId, data, onBack, reload }: Props) {
 
       {tab === 'modules' && (
         <div className="space-y-2">
-          {courseModules.length === 0 ? <div className="glass-card"><EmptyState icon={<GraduationCap size={28} className="text-[var(--text-secondary)]" />} title="No modules" message="Add modules in the Structure tab." /></div> : (
+          <button onClick={() => setCreateModal({ level: 'module', parentId: course.id, parentLabel: course.name })} className="flex items-center gap-2 rounded-xl border border-ink/10 px-4 py-2 text-sm font-medium text-[var(--text-primary)] hover:bg-ink/5">
+            <Plus size={16} /> Add Module
+          </button>
+          {courseModules.length === 0 ? <div className="glass-card"><EmptyState icon={<GraduationCap size={28} className="text-[var(--text-secondary)]" />} title="No modules" message="Add your first module to start organizing topics." /></div> : (
             courseModules.map((mod) => {
               const modTopics = courseTopics.filter((t) => t.module_id === mod.id);
               return (
@@ -142,6 +149,18 @@ export function CourseView({ courseId, data, onBack, reload }: Props) {
 
       {tab === 'topics' && (
         <div className="space-y-2">
+          {courseModules.length === 0 ? (
+            <div className="glass-card"><EmptyState icon={<GraduationCap size={28} className="text-[var(--text-secondary)]" />} title="Add a module first" message="Topics live inside modules — create one to start adding topics." action={<button onClick={() => setCreateModal({ level: 'module', parentId: course.id, parentLabel: course.name })} className="btn-primary flex items-center gap-2 px-5 py-2.5 text-sm"><Plus size={16} /> Add Module</button>} /></div>
+          ) : (
+            <div className="flex flex-wrap items-center gap-2">
+              <select value={topicModuleId} onChange={(e) => setTopicModuleId(e.target.value)} className="rounded-xl border border-ink/10 bg-ink/[0.03] px-3 py-2 text-sm text-[var(--text-primary)] focus:border-[var(--accent)]/50">
+                {courseModules.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+              </select>
+              <button onClick={() => setCreateModal({ level: 'topic', parentId: topicModuleId || courseModules[0].id, parentLabel: (courseModules.find((m) => m.id === (topicModuleId || courseModules[0].id)) || courseModules[0]).name })} className="flex items-center gap-2 rounded-xl border border-ink/10 px-4 py-2 text-sm font-medium text-[var(--text-primary)] hover:bg-ink/5">
+                <Plus size={16} /> Add Topic
+              </button>
+            </div>
+          )}
           {courseTopics.length === 0 ? <p className="text-sm text-[var(--text-secondary)]">No topics yet.</p> : (
             courseTopics.map((topic) => <TopicRow key={topic.id} topic={topic} reload={reload} />)
           )}
@@ -150,6 +169,9 @@ export function CourseView({ courseId, data, onBack, reload }: Props) {
 
       {tab === 'classes' && (
         <div className="space-y-2">
+          <button onClick={() => setLogClassModal(true)} className="flex items-center gap-2 rounded-xl border border-ink/10 px-4 py-2 text-sm font-medium text-[var(--text-primary)] hover:bg-ink/5">
+            <Plus size={16} /> Log Class
+          </button>
           {courseClasses.length === 0 ? <p className="text-sm text-[var(--text-secondary)]">No classes logged yet.</p> : (
             courseClasses.map((c) => { const log = data.classLogs.find((l) => l.class_id === c.id); const topic = data.topics.find((t) => t.id === c.topic_id); return (
               <div key={c.id} className="glass-card p-4">
@@ -189,9 +211,38 @@ export function CourseView({ courseId, data, onBack, reload }: Props) {
       )}
 
       {tab === 'notes' && (
-        <div className="glass-card p-5">
-          <p className="text-sm text-[var(--text-secondary)]">Course notes will be available here. This connects to the Class Logger in Phase 3.</p>
+        <div className="space-y-2">
+          <button onClick={() => setLogClassModal(true)} className="flex items-center gap-2 rounded-xl border border-ink/10 px-4 py-2 text-sm font-medium text-[var(--text-primary)] hover:bg-ink/5">
+            <Plus size={16} /> Log Class
+          </button>
+          {(() => {
+            const notedClasses = courseClasses
+              .map((c) => ({ c, log: data.classLogs.find((l) => l.class_id === c.id) }))
+              .filter((x) => x.log && (x.log.raw_thoughts || x.log.questions.length || x.log.confusions.length || x.log.learnings.length))
+              .sort((a, b) => new Date(b.c.session_date).getTime() - new Date(a.c.session_date).getTime());
+            if (notedClasses.length === 0) {
+              return <p className="text-sm text-[var(--text-secondary)]">No notes yet — notes come from what you write when you log a class.</p>;
+            }
+            return notedClasses.map(({ c, log }) => (
+              <div key={c.id} className="glass-card p-4">
+                <p className="text-sm font-medium text-[var(--text-primary)]">{c.title}</p>
+                <p className="text-xs text-[var(--text-secondary)]">{new Date(c.session_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
+                {log!.raw_thoughts && <p className="mt-2 rounded-lg border border-ink/8 bg-ink/[0.02] px-3 py-2 text-xs text-[var(--text-secondary)]">{log!.raw_thoughts}</p>}
+                {log!.learnings.length > 0 && <p className="mt-2 text-xs text-[var(--text-secondary)]"><span className="font-medium text-[var(--text-primary)]">Learned: </span>{log!.learnings.join('; ')}</p>}
+                {log!.confusions.length > 0 && <p className="mt-1 text-xs text-[var(--text-secondary)]"><span className="font-medium text-[var(--text-primary)]">Confused by: </span>{log!.confusions.join('; ')}</p>}
+                {log!.questions.length > 0 && <p className="mt-1 text-xs text-[var(--text-secondary)]"><span className="font-medium text-[var(--text-primary)]">Questions: </span>{log!.questions.join('; ')}</p>}
+              </div>
+            ));
+          })()}
         </div>
+      )}
+
+      {createModal && (
+        <CreateEntityModal level={createModal.level} parentId={createModal.parentId} parentLabel={createModal.parentLabel} data={data} onClose={() => setCreateModal(null)} onCreated={() => { setCreateModal(null); reload(); }} />
+      )}
+
+      {logClassModal && (
+        <LogClassModal courses={data.courses} modules={data.modules} topics={data.topics} defaultCourseId={course.id} onClose={() => setLogClassModal(false)} onLogged={() => { setLogClassModal(false); reload(); }} />
       )}
     </div>
   );
