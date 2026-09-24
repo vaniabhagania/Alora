@@ -2,6 +2,7 @@ export interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
   content: string;
   timestamp?: string;
+  image?: { mimeType: string; data: string };
 }
 
 export interface ChatContext {
