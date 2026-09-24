@@ -145,7 +145,7 @@ export function MemoryPage() {
                   <span className="text-xs text-[var(--text-secondary)]">{new Date(m.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
                   {m.source !== 'manual' && <span className="text-xs text-[var(--accent-secondary)]">{m.source}</span>}
                 </div>
-                <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+                <div className="flex items-center gap-0.5 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100">
                   <button onClick={() => setEditModal(m)} className="rounded-lg p-1.5 text-[var(--text-secondary)] hover:bg-ink/5 hover:text-[var(--text-primary)]"><Pencil size={14} /></button>
                   <button onClick={() => setDeleteTarget(m.id)} className="rounded-lg p-1.5 text-[var(--text-secondary)] hover:bg-rose-500/10 hover:text-rose-400"><Trash2 size={14} /></button>
                 </div>

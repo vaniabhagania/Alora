@@ -72,7 +72,7 @@ export function AttachmentList({ entityType, entityId }: Props) {
           )}
           <button
             onClick={() => handleDelete(a)}
-            className="absolute -right-1.5 -top-1.5 hidden h-5 w-5 items-center justify-center rounded-full bg-rose-500 text-white group-hover:flex"
+            className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-rose-500 text-white md:hidden md:group-hover:flex"
           >
             <X size={12} />
           </button>

@@ -170,7 +170,7 @@ export function TasksPage() {
                   {task.category && <span className="text-xs text-[var(--text-secondary)]">{task.category}</span>}
                 </div>
               </div>
-              <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+              <div className="flex shrink-0 items-center gap-0.5 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100">
                 <button onClick={() => setEditModal(task)} className="rounded-lg p-1.5 text-[var(--text-secondary)] hover:bg-ink/5 hover:text-[var(--text-primary)]">
                   <Pencil size={16} />
                 </button>
