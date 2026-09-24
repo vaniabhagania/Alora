@@ -286,14 +286,14 @@ export function AcademiaHierarchy({ data, reload, onOpenCourse }: Props) {
 
 // --- Dependency counting ---
 
-interface DeleteTarget {
+export interface DeleteTarget {
   id: string;
   level: Level;
   label: string;
   deps: { label: string; count: number }[];
 }
 
-function countDeps(data: AcademicData, level: Level, id: string): { label: string; count: number }[] {
+export function countDeps(data: AcademicData, level: Level, id: string): { label: string; count: number }[] {
   const deps: { label: string; count: number }[] = [];
   if (level === 'year') {
     const sems = data.semesters.filter((s) => s.academic_year_id === id);
@@ -326,7 +326,7 @@ function countDeps(data: AcademicData, level: Level, id: string): { label: strin
 
 // --- Delete modal with dependency info ---
 
-function DeleteConfirmModal({ target, onClose, onConfirm, onArchive }: { target: DeleteTarget; onClose: () => void; onConfirm: () => void; onArchive: () => void }) {
+export function DeleteConfirmModal({ target, onClose, onConfirm, onArchive }: { target: DeleteTarget; onClose: () => void; onConfirm: () => void; onArchive: () => void }) {
   const hasDeps = target.deps.length > 0;
   return (
     <Modal open={true} onClose={onClose} title={`Delete ${target.level}?`} maxWidth="440px">
@@ -443,13 +443,13 @@ function HierarchyRow({ icon, label, sublabel, badge, color, indent = 0, onClick
 
 // --- Helpers ---
 
-function levelTable(level: Level): string {
+export function levelTable(level: Level): string {
   return { year: 'academic_years', semester: 'semesters', course: 'courses', module: 'modules', topic: 'topics' }[level];
 }
 
 // --- Edit modal data type ---
 
-interface EditModalData {
+export interface EditModalData {
   level: Level;
   id: string;
   name?: string;
@@ -531,7 +531,7 @@ export function CreateEntityModal({ level, parentId, parentLabel, data, onClose,
 
 // --- Edit entity modal ---
 
-function EditEntityModal({ data: editData, allData, onClose, onSaved }: { data: EditModalData; allData: AcademicData; onClose: () => void; onSaved: () => void }) {
+export function EditEntityModal({ data: editData, allData, onClose, onSaved }: { data: EditModalData; allData: AcademicData; onClose: () => void; onSaved: () => void }) {
   const toast = useToast();
   const { level, id } = editData;
   const [val, setVal] = useState(editData.name || editData.label || '');
