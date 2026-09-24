@@ -106,7 +106,7 @@ export function SettingsPage() {
       <section className="glass-card mb-4 p-5">
         <div className="mb-4 flex items-center gap-3"><Brain size={18} className="text-[var(--accent-secondary)]" /><h2 className="font-display font-semibold text-[var(--text-primary)]">AI & Privacy</h2></div>
         <div className="space-y-3 text-sm text-[var(--text-secondary)]">
-          <p>Alora Chat is powered by Claude, called through a secure server-side function — the API key never reaches your browser. If that function isn't configured yet, Alora falls back to a local rule-based reply so chat still works.</p>
+          <p>Alora Chat is powered by an AI model, called through a secure server-side function — the API key never reaches your browser. If that function isn't configured yet, Alora falls back to a local rule-based reply so chat still works.</p>
           <p>Your raw memories and journal entries are never silently overwritten. AI-generated content is always kept separate and marked as a suggestion.</p>
         </div>
         <div className="mt-4 border-t border-black/8 pt-4">

@@ -2,21 +2,23 @@ import { supabase } from '@/lib/supabase';
 import type { AIChatResponse, AIProvider, ChatContext, ChatMessage } from './types';
 
 /**
- * Claude-backed chat, routed through the `alora-chat` Supabase Edge Function
- * so the Anthropic API key never reaches the browser bundle.
+ * Real-LLM-backed chat, routed through the `alora-chat` Supabase Edge
+ * Function so the provider's API key never reaches the browser bundle.
+ * The edge function currently calls OpenAI — swapping providers only
+ * means changing that one server-side file, not this client.
  *
  * Only `chat()` is upgraded — the rest of the AIProvider surface
  * (generateQuiz, summarizeClass, etc.) delegates to the wrapped local
  * provider unchanged, since those weren't part of this request.
  *
  * If the edge function is unreachable or misconfigured (e.g. the project
- * owner hasn't set ANTHROPIC_API_KEY yet), chat() falls back to the local
- * provider's rule-based reply instead of breaking the UI. The local
+ * owner hasn't set the provider's API key yet), chat() falls back to the
+ * local provider's rule-based reply instead of breaking the UI. The local
  * provider runs its own distress check too, so the safety net holds even
  * on the fallback path.
  */
-export class ClaudeProvider implements AIProvider {
-  name = 'claude';
+export class RemoteAIProvider implements AIProvider {
+  name = 'remote';
 
   constructor(private local: AIProvider) {}
 
