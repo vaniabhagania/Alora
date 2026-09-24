@@ -2,10 +2,13 @@ import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth';
 import { useToast } from '@/lib/toast';
+import { aiProvider } from '@/lib/ai/provider';
+import { trackEvent } from '@/lib/brain/events';
 import type { JournalEntry } from '@/lib/types';
+import type { AIReflection } from '@/lib/ai/types';
 import { Modal, ConfirmModal } from '@/components/Modal';
 import { EmptyState, Skeleton } from '@/components/ui';
-import { Plus, BookOpen, Trash2, BookMarked, Smile, Calendar } from 'lucide-react';
+import { Plus, BookOpen, Trash2, BookMarked, Smile, Calendar, Sparkles } from 'lucide-react';
 
 const MOODS = ['great', 'good', 'okay', 'low', 'rough'];
 const CATEGORIES = ['reflection', 'idea', 'experience', 'lesson', 'growth', 'academic', 'personal'];
@@ -17,6 +20,8 @@ export function JournalPage() {
   const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [createModal, setCreateModal] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const [reflecting, setReflecting] = useState(false);
+  const [reflection, setReflection] = useState<AIReflection | null>(null);
 
   const loadEntries = useCallback(async () => {
     if (!profile) return;
@@ -38,6 +43,24 @@ export function JournalPage() {
     setDeleteTarget(null);
   }
 
+  async function handleReflect() {
+    setReflecting(true);
+    try {
+      const result = await aiProvider.reflect(entries.slice(0, 15).map((e) => e.content));
+      setReflection(result);
+      await supabase.from('insights').insert({
+        insight_type: 'journal_reflection',
+        title: 'Journal reflection',
+        description: result.insights.join(' '),
+        evidence: result.patterns,
+      });
+      await trackEvent('journal_saved_to_memory', 'journal', null, { insightCount: result.insights.length });
+    } catch {
+      toast.show('Could not reflect right now.', 'error');
+    }
+    setReflecting(false);
+  }
+
   const moodColors: Record<string, string> = {
     great: 'text-emerald-400', good: 'text-sky-400', okay: 'text-[var(--text-secondary)]', low: 'text-orange-400', rough: 'text-rose-400',
   };
@@ -49,10 +72,44 @@ export function JournalPage() {
           <h1 className="font-display text-2xl font-bold text-[var(--text-primary)]">Journal</h1>
           <p className="mt-1 text-sm text-[var(--text-secondary)]">Your personal life log. Every entry is preserved forever.</p>
         </div>
-        <button onClick={() => setCreateModal(true)} className="btn-primary flex items-center gap-2 px-4 py-2 text-sm">
-          <Plus size={16} /> New Entry
-        </button>
+        <div className="flex items-center gap-2">
+          {entries.length >= 3 && (
+            <button onClick={handleReflect} disabled={reflecting} className="flex items-center gap-2 rounded-xl border border-black/10 px-4 py-2 text-sm font-medium text-[var(--text-primary)] hover:bg-black/5 disabled:opacity-50">
+              <Sparkles size={16} /> {reflecting ? 'Reflecting...' : 'Reflect'}
+            </button>
+          )}
+          <button onClick={() => setCreateModal(true)} className="btn-primary flex items-center gap-2 px-4 py-2 text-sm">
+            <Plus size={16} /> New Entry
+          </button>
+        </div>
       </div>
+
+      {reflection && (
+        <div className="glass-card mb-6 p-5 animate-fade-in">
+          <div className="mb-3 flex items-center justify-between">
+            <h3 className="flex items-center gap-2 font-display font-semibold text-[var(--text-primary)]"><Sparkles size={16} className="text-[var(--accent-secondary)]" /> ALORA's Reflection</h3>
+            <button onClick={() => setReflection(null)} className="text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)]">Dismiss</button>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <p className="mb-1.5 text-xs font-medium uppercase tracking-wider text-[var(--text-secondary)]">Patterns</p>
+              <ul className="space-y-1 text-sm text-[var(--text-primary)]">{reflection.patterns.map((p, i) => <li key={i}>• {p}</li>)}</ul>
+            </div>
+            <div>
+              <p className="mb-1.5 text-xs font-medium uppercase tracking-wider text-[var(--text-secondary)]">Insights</p>
+              <ul className="space-y-1 text-sm text-[var(--text-primary)]">{reflection.insights.map((p, i) => <li key={i}>• {p}</li>)}</ul>
+            </div>
+            <div>
+              <p className="mb-1.5 text-xs font-medium uppercase tracking-wider text-[var(--text-secondary)]">Challenges</p>
+              <ul className="space-y-1 text-sm text-[var(--text-primary)]">{reflection.challenges.map((p, i) => <li key={i}>• {p}</li>)}</ul>
+            </div>
+            <div>
+              <p className="mb-1.5 text-xs font-medium uppercase tracking-wider text-[var(--text-secondary)]">Suggested Actions</p>
+              <ul className="space-y-1 text-sm text-[var(--text-primary)]">{reflection.suggestedActions.map((p, i) => <li key={i}>• {p}</li>)}</ul>
+            </div>
+          </div>
+        </div>
+      )}
 
       {loading ? (
         <div className="space-y-3">
@@ -84,7 +141,7 @@ export function JournalPage() {
                       <Smile size={12} /> {entry.mood}
                     </span>
                   )}
-                  <span className="rounded-full bg-white/5 px-2 py-0.5 text-xs capitalize text-[var(--text-secondary)]">{entry.category}</span>
+                  <span className="rounded-full bg-black/5 px-2 py-0.5 text-xs capitalize text-[var(--text-secondary)]">{entry.category}</span>
                 </div>
                 <button onClick={() => setDeleteTarget(entry.id)} className="rounded-lg p-1.5 text-[var(--text-secondary)] opacity-0 transition-opacity hover:bg-rose-500/10 hover:text-rose-400 group-hover:opacity-100">
                   <Trash2 size={16} />
@@ -146,33 +203,33 @@ function CreateEntryModal({ onClose, onCreated }: { onClose: () => void; onCreat
       <div className="space-y-4">
         <div>
           <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Your thoughts</label>
-          <textarea value={content} onChange={(e) => setContent(e.target.value)} placeholder="What's on your mind? What happened today? What did you learn? What are you feeling?" rows={6} className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50" />
+          <textarea value={content} onChange={(e) => setContent(e.target.value)} placeholder="What's on your mind? What happened today? What did you learn? What are you feeling?" rows={6} className="w-full rounded-xl border border-black/10 bg-black/[0.03] px-4 py-3 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50" />
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Mood</label>
-            <select value={mood} onChange={(e) => setMood(e.target.value)} className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] focus:border-[var(--accent)]/50">
+            <select value={mood} onChange={(e) => setMood(e.target.value)} className="w-full rounded-xl border border-black/10 bg-black/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] focus:border-[var(--accent)]/50">
               <option value="">None</option>
               {MOODS.map((m) => <option key={m} value={m} className="capitalize">{m}</option>)}
             </select>
           </div>
           <div>
             <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Category</label>
-            <select value={category} onChange={(e) => setCategory(e.target.value)} className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] focus:border-[var(--accent)]/50">
+            <select value={category} onChange={(e) => setCategory(e.target.value)} className="w-full rounded-xl border border-black/10 bg-black/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] focus:border-[var(--accent)]/50">
               {CATEGORIES.map((c) => <option key={c} value={c} className="capitalize">{c}</option>)}
             </select>
           </div>
         </div>
         <div>
           <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Tags (comma-separated)</label>
-          <input type="text" value={tags} onChange={(e) => setTags(e.target.value)} placeholder="growth, statistics, breakthrough" className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50" />
+          <input type="text" value={tags} onChange={(e) => setTags(e.target.value)} placeholder="growth, statistics, breakthrough" className="w-full rounded-xl border border-black/10 bg-black/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50" />
         </div>
         <label className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
           <input type="checkbox" checked={novelEligible} onChange={(e) => setNovelEligible(e.target.checked)} className="accent-[var(--accent)]" />
           Eligible for Novel (ALORA can use this in your future book)
         </label>
         <div className="flex justify-end gap-3">
-          <button onClick={onClose} className="rounded-xl px-4 py-2 text-sm font-medium text-[var(--text-secondary)] hover:bg-white/5">Cancel</button>
+          <button onClick={onClose} className="rounded-xl px-4 py-2 text-sm font-medium text-[var(--text-secondary)] hover:bg-black/5">Cancel</button>
           <button onClick={handleCreate} disabled={saving} className="btn-primary px-5 py-2 text-sm">{saving ? 'Saving...' : 'Save Entry'}</button>
         </div>
       </div>

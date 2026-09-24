@@ -62,7 +62,7 @@ export function AcademiaDashboard({ data, onOpenCourse, onNavigate }: Props) {
                 <button
                   key={course.id}
                   onClick={() => onOpenCourse(course.id)}
-                  className="group flex items-center gap-3 rounded-xl border border-white/5 bg-white/[0.02] p-3 text-left transition-all hover:border-white/15 hover:bg-white/[0.04]"
+                  className="group flex items-center gap-3 rounded-xl border border-black/8 bg-black/[0.02] p-3 text-left transition-all hover:border-black/15 hover:bg-black/[0.04]"
                 >
                   <div className="h-8 w-8 shrink-0 rounded-lg" style={{ background: course.color }} />
                   <div className="min-w-0 flex-1">
@@ -144,7 +144,7 @@ export function AcademiaDashboard({ data, onOpenCourse, onNavigate }: Props) {
             {deadlines.map((task) => {
               const course = task.related_course_id ? data.courses.find((c) => c.id === task.related_course_id) : null;
               return (
-                <div key={task.id} className="flex items-center gap-3 rounded-lg border border-white/5 bg-white/[0.02] px-3 py-2">
+                <div key={task.id} className="flex items-center gap-3 rounded-lg border border-black/8 bg-black/[0.02] px-3 py-2">
                   <div className={`h-2 w-2 rounded-full ${task.priority === 'urgent' ? 'bg-rose-400' : task.priority === 'high' ? 'bg-orange-400' : 'bg-[var(--accent)]'}`} />
                   <span className="flex-1 text-sm text-[var(--text-primary)]">{task.title}</span>
                   {course && <span className="text-xs text-[var(--text-secondary)]">{course.name}</span>}

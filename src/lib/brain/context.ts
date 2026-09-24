@@ -20,7 +20,9 @@ export async function getStudentContext(
 
   const fields = getContextFields(contextType);
 
-  const queries: Promise<unknown>[] = [];
+  // PostgrestBuilder.then() types as PromiseLike, not Promise (no catch/finally) —
+  // Promise.all() accepts PromiseLike elements just fine.
+  const queries: PromiseLike<unknown>[] = [];
 
   if (fields.profile) {
     queries.push(
@@ -180,11 +182,17 @@ function computeWeakTopics(
   quizAttempts: QuizAttempt[],
 ): { name: string; confidence: number; reasons: string[] }[] {
   const weakTopics: { name: string; confidence: number; reasons: string[] }[] = [];
+  const recentReviewConcepts = new Set(
+    quizAttempts.slice(0, 10).flatMap((a) => a.concepts_needing_review || []).map((c) => c.toLowerCase()),
+  );
 
   for (const topic of topics) {
     const reasons: string[] = [];
     if (topic.is_weak || topic.status === 'not_started' || topic.status === 'introduced') {
       reasons.push('Marked as weak');
+    }
+    if (recentReviewConcepts.has(topic.name.toLowerCase())) {
+      reasons.push('Flagged for review in a recent quiz');
     }
     if (topic.confidence < 50) {
       reasons.push(`Confidence at ${topic.confidence}%`);

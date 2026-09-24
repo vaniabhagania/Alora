@@ -5,7 +5,7 @@ import { useToast } from '@/lib/toast';
 import type { Identity, Goal, Habit } from '@/lib/types';
 import { Modal, ConfirmModal } from '@/components/Modal';
 import { EmptyState, Skeleton, ProgressRing, ProgressBar } from '@/components/ui';
-import { Plus, Sparkles, Trash2, Target, Repeat, TrendingUp, CheckCircle2 } from 'lucide-react';
+import { Plus, Sparkles, Trash2, Target, Repeat, CheckCircle2 } from 'lucide-react';
 
 type Tab = 'identities' | 'goals' | 'habits';
 
@@ -87,9 +87,9 @@ export function FuturePage() {
 
       <div className="mb-6 flex gap-2">
         {tabs.map((t) => (
-          <button key={t.id} onClick={() => setTab(t.id)} className={`flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition-colors ${tab === t.id ? 'bg-[var(--accent)]/15 text-[var(--text-primary)]' : 'text-[var(--text-secondary)] hover:bg-white/5'}`}>
+          <button key={t.id} onClick={() => setTab(t.id)} className={`flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition-colors ${tab === t.id ? 'bg-[var(--accent)]/15 text-[var(--text-primary)]' : 'text-[var(--text-secondary)] hover:bg-black/5'}`}>
             {t.icon} {t.label}
-            {t.count > 0 && <span className="rounded-full bg-white/10 px-1.5 py-0.5 text-xs">{t.count}</span>}
+            {t.count > 0 && <span className="rounded-full bg-black/10 px-1.5 py-0.5 text-xs">{t.count}</span>}
           </button>
         ))}
       </div>
@@ -120,13 +120,13 @@ export function FuturePage() {
                       <div className="mb-2">
                         <p className="mb-1 text-xs uppercase tracking-wider text-[var(--text-secondary)]">Skills</p>
                         <div className="flex flex-wrap gap-1">
-                          {id.skills_required.slice(0, 4).map((s) => <span key={s} className="rounded-full bg-white/5 px-2 py-0.5 text-xs text-[var(--text-secondary)]">{s}</span>)}
+                          {id.skills_required.slice(0, 4).map((s) => <span key={s} className="rounded-full bg-black/5 px-2 py-0.5 text-xs text-[var(--text-secondary)]">{s}</span>)}
                         </div>
                       </div>
                     )}
                   </div>
                 </div>
-                {id.why_it_matters && <p className="border-t border-white/5 pt-3 text-xs italic text-[var(--text-secondary)]">{id.why_it_matters}</p>}
+                {id.why_it_matters && <p className="border-t border-black/8 pt-3 text-xs italic text-[var(--text-secondary)]">{id.why_it_matters}</p>}
               </div>
             ))}
           </div>
@@ -172,7 +172,7 @@ export function FuturePage() {
             return (
               <div key={h.id} className="glass-card group flex items-center gap-4 p-4 animate-fade-in">
                 <button onClick={() => toggleHabit(h)} className="shrink-0">
-                  {doneToday ? <CheckCircle2 size={24} className="text-emerald-400" /> : <div className="h-6 w-6 rounded-full border-2 border-white/20 hover:border-[var(--accent-secondary)]" />}
+                  {doneToday ? <CheckCircle2 size={24} className="text-emerald-400" /> : <div className="h-6 w-6 rounded-full border-2 border-black/15 hover:border-[var(--accent-secondary)]" />}
                 </button>
                 <div className="flex-1">
                   <p className="text-sm font-medium text-[var(--text-primary)]">{h.name}</p>
@@ -239,21 +239,21 @@ function CreateModal({ tab, identities, onClose, onCreated }: { tab: Tab; identi
       <div className="space-y-4">
         <div>
           <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Name</label>
-          <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder={tab === 'identities' ? 'e.g. Data Scientist' : tab === 'goals' ? 'e.g. Master Statistics' : 'e.g. Study 30 min daily'} className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50" />
+          <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder={tab === 'identities' ? 'e.g. Data Scientist' : tab === 'goals' ? 'e.g. Master Statistics' : 'e.g. Study 30 min daily'} className="w-full rounded-xl border border-black/10 bg-black/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50" />
         </div>
         {tab === 'identities' && (
           <>
             <div>
               <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Vision</label>
-              <textarea value={vision} onChange={(e) => setVision(e.target.value)} placeholder="What does this future self look like?" rows={2} className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50" />
+              <textarea value={vision} onChange={(e) => setVision(e.target.value)} placeholder="What does this future self look like?" rows={2} className="w-full rounded-xl border border-black/10 bg-black/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50" />
             </div>
             <div>
               <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Why it matters</label>
-              <textarea value={whyItMatters} onChange={(e) => setWhyItMatters(e.target.value)} placeholder="Why does this matter to you?" rows={2} className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50" />
+              <textarea value={whyItMatters} onChange={(e) => setWhyItMatters(e.target.value)} placeholder="Why does this matter to you?" rows={2} className="w-full rounded-xl border border-black/10 bg-black/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50" />
             </div>
             <div>
               <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Skills (comma-separated)</label>
-              <input type="text" value={skills} onChange={(e) => setSkills(e.target.value)} placeholder="Python, Statistics, ML" className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50" />
+              <input type="text" value={skills} onChange={(e) => setSkills(e.target.value)} placeholder="Python, Statistics, ML" className="w-full rounded-xl border border-black/10 bg-black/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50" />
             </div>
             <div>
               <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Color</label>
@@ -269,11 +269,11 @@ function CreateModal({ tab, identities, onClose, onCreated }: { tab: Tab; identi
           <>
             <div>
               <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Description</label>
-              <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="What does achieving this goal look like?" rows={2} className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50" />
+              <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="What does achieving this goal look like?" rows={2} className="w-full rounded-xl border border-black/10 bg-black/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50" />
             </div>
             <div>
               <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Target Date</label>
-              <input type="date" value={targetDate} onChange={(e) => setTargetDate(e.target.value)} className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] focus:border-[var(--accent)]/50" />
+              <input type="date" value={targetDate} onChange={(e) => setTargetDate(e.target.value)} className="w-full rounded-xl border border-black/10 bg-black/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] focus:border-[var(--accent)]/50" />
             </div>
           </>
         )}
@@ -281,7 +281,7 @@ function CreateModal({ tab, identities, onClose, onCreated }: { tab: Tab; identi
           <>
             <div>
               <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Frequency</label>
-              <select value={frequency} onChange={(e) => setFrequency(e.target.value)} className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] focus:border-[var(--accent)]/50">
+              <select value={frequency} onChange={(e) => setFrequency(e.target.value)} className="w-full rounded-xl border border-black/10 bg-black/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] focus:border-[var(--accent)]/50">
                 <option value="daily">Daily</option>
                 <option value="weekly">Weekly</option>
                 <option value="3x_week">3x per week</option>
@@ -290,7 +290,7 @@ function CreateModal({ tab, identities, onClose, onCreated }: { tab: Tab; identi
             {identities.length > 0 && (
               <div>
                 <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Linked Identity (optional)</label>
-                <select value={identityId} onChange={(e) => setIdentityId(e.target.value)} className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] focus:border-[var(--accent)]/50">
+                <select value={identityId} onChange={(e) => setIdentityId(e.target.value)} className="w-full rounded-xl border border-black/10 bg-black/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] focus:border-[var(--accent)]/50">
                   <option value="">None</option>
                   {identities.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
                 </select>
@@ -299,7 +299,7 @@ function CreateModal({ tab, identities, onClose, onCreated }: { tab: Tab; identi
           </>
         )}
         <div className="flex justify-end gap-3">
-          <button onClick={onClose} className="rounded-xl px-4 py-2 text-sm font-medium text-[var(--text-secondary)] hover:bg-white/5">Cancel</button>
+          <button onClick={onClose} className="rounded-xl px-4 py-2 text-sm font-medium text-[var(--text-secondary)] hover:bg-black/5">Cancel</button>
           <button onClick={handleCreate} disabled={saving} className="btn-primary px-5 py-2 text-sm">{saving ? 'Creating...' : 'Create'}</button>
         </div>
       </div>

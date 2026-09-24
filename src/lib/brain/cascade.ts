@@ -28,7 +28,7 @@ export async function cascadeQuizResults(
     for (const topic of topics as Topic[]) {
       const newMistakes = topicQuestions
         .filter((q) => !q.is_correct)
-        .map((q) => q.question || q.topic)
+        .map((q) => q.topic)
         .filter((m) => !topic.mistakes.includes(m));
 
       const updatedMistakes = [...topic.mistakes, ...newMistakes].slice(-20);

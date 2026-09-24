@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/lib/toast';
+import { aiProvider } from '@/lib/ai/provider';
 import type { AcademicData } from '@/lib/academic';
-import type { AcademicYear, Semester, Course, Module, Topic, ClassSession, ClassLog } from '@/lib/types';
-import { Modal, ConfirmModal } from '@/components/Modal';
+import type { Course, Module, Topic, ClassSession } from '@/lib/types';
+import { Modal } from '@/components/Modal';
 import { EmptyState, PopoverMenu } from '@/components/ui';
 import {
   ChevronRight, ChevronDown, Plus, GraduationCap, FileText, Trash2,
-  Pencil, Archive, ArchiveRestore, ArrowUp, ArrowDown,
+  Pencil, Archive, ArchiveRestore, ArrowUp, ArrowDown, Sparkles, CheckSquare,
 } from 'lucide-react';
 
 type Level = 'year' | 'semester' | 'course' | 'module' | 'topic';
@@ -82,7 +83,7 @@ export function AcademiaHierarchy({ data, reload, onOpenCourse }: Props) {
         <div className="flex gap-2">
           <button
             onClick={() => setShowArchived(!showArchived)}
-            className="flex items-center gap-1.5 rounded-xl border border-white/10 px-3 py-2 text-xs font-medium text-[var(--text-secondary)] transition-colors hover:bg-white/5"
+            className="flex items-center gap-1.5 rounded-xl border border-black/10 px-3 py-2 text-xs font-medium text-[var(--text-secondary)] transition-colors hover:bg-black/5"
           >
             <Archive size={14} /> {showArchived ? 'Hide Archived' : 'Show Archived'}
           </button>
@@ -129,7 +130,7 @@ export function AcademiaHierarchy({ data, reload, onOpenCourse }: Props) {
                   }
                 />
                 {isExp && (
-                  <div className="ml-6 border-l border-white/5 pl-2">
+                  <div className="ml-6 border-l border-black/8 pl-2">
                     {yearSems.length === 0 ? (
                       <ContextualEmpty message="No semesters yet." actionLabel="+ Add Semester" onAction={() => setCreateModal({ level: 'semester', parentId: year.id, parentLabel: year.label })} />
                     ) : (
@@ -159,7 +160,7 @@ export function AcademiaHierarchy({ data, reload, onOpenCourse }: Props) {
                               }
                             />
                             {semExp && (
-                              <div className="ml-4 border-l border-white/5">
+                              <div className="ml-4 border-l border-black/8">
                                 {semCourses.length === 0 ? (
                                   <ContextualEmpty message="No courses in this semester yet." actionLabel="+ Add Course" onAction={() => setCreateModal({ level: 'course', parentId: sem.id, parentLabel: sem.label })} />
                                 ) : (
@@ -192,7 +193,7 @@ export function AcademiaHierarchy({ data, reload, onOpenCourse }: Props) {
                                           }
                                         />
                                         {cExp && (
-                                          <div className="ml-4 border-l border-white/5">
+                                          <div className="ml-4 border-l border-black/8">
                                             {courseModules.length === 0 ? (
                                               <ContextualEmpty message="No modules yet." actionLabel="+ Add Module" onAction={() => setCreateModal({ level: 'module', parentId: course.id, parentLabel: course.name })} />
                                             ) : (
@@ -222,7 +223,7 @@ export function AcademiaHierarchy({ data, reload, onOpenCourse }: Props) {
                                                       }
                                                     />
                                                     {mExp && (
-                                                      <div className="ml-4 border-l border-white/5">
+                                                      <div className="ml-4 border-l border-black/8">
                                                         {modTopics.length === 0 ? (
                                                           <ContextualEmpty message="No topics yet." actionLabel="+ Add Topic" onAction={() => setCreateModal({ level: 'topic', parentId: mod.id, parentLabel: mod.name })} />
                                                         ) : (
@@ -353,7 +354,7 @@ function DeleteConfirmModal({ target, onClose, onConfirm, onArchive }: { target:
           </p>
         )}
         <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
-          <button onClick={onClose} className="rounded-xl px-4 py-2 text-sm font-medium text-[var(--text-secondary)] hover:bg-white/5">Cancel</button>
+          <button onClick={onClose} className="rounded-xl px-4 py-2 text-sm font-medium text-[var(--text-secondary)] hover:bg-black/5">Cancel</button>
           {hasDeps && (
             <button onClick={onArchive} className="rounded-xl border border-[var(--accent)]/30 bg-[var(--accent)]/10 px-4 py-2 text-sm font-medium text-[var(--accent-secondary)] transition-colors hover:bg-[var(--accent)]/20">
               Archive instead
@@ -379,7 +380,7 @@ function TopicRow({ topic, classCount, onEdit, onArchive, onUnarchive, onDelete 
   onDelete: () => void;
 }) {
   return (
-    <div className={`group flex items-center gap-2 rounded-lg px-4 py-2 hover:bg-white/[0.02] ${topic.archived ? 'opacity-50' : ''}`} style={{ paddingLeft: '44px' }}>
+    <div className={`group flex items-center gap-2 rounded-lg px-4 py-2 hover:bg-black/[0.02] ${topic.archived ? 'opacity-50' : ''}`} style={{ paddingLeft: '44px' }}>
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium text-[var(--text-primary)]">{topic.name}</p>
         <p className="text-xs text-[var(--text-secondary)]">
@@ -427,14 +428,14 @@ function HierarchyRow({ icon, label, sublabel, badge, color, indent = 0, onClick
   menu?: React.ReactNode;
 }) {
   return (
-    <div className="group flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2.5 transition-colors hover:bg-white/[0.03]" style={{ paddingLeft: `${12 + indent * 8}px` }} onClick={onClick}>
+    <div className="group flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2.5 transition-colors hover:bg-black/[0.03]" style={{ paddingLeft: `${12 + indent * 8}px` }} onClick={onClick}>
       <span className="shrink-0 text-[var(--text-secondary)]">{icon}</span>
       {color && <div className="h-3 w-3 shrink-0 rounded-md" style={{ background: color }} />}
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium text-[var(--text-primary)]">{label}</p>
         {sublabel && <p className="truncate text-xs text-[var(--text-secondary)]">{sublabel}</p>}
       </div>
-      {badge && <span className="shrink-0 rounded-full bg-white/5 px-2 py-0.5 text-xs text-[var(--text-secondary)]">{badge}</span>}
+      {badge && <span className="shrink-0 rounded-full bg-black/5 px-2 py-0.5 text-xs text-[var(--text-secondary)]">{badge}</span>}
       <div className="flex shrink-0 items-center opacity-60 transition-opacity group-hover:opacity-100">{menu}</div>
     </div>
   );
@@ -506,21 +507,21 @@ function CreateEntityModal({ level, parentId, parentLabel, data, onClose, onCrea
         {parentLabel && <p className="text-sm text-[var(--text-secondary)]">Adding to: {parentLabel}</p>}
         <div>
           <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">{level === 'year' || level === 'semester' ? 'Label' : 'Name'}</label>
-          <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder={level === 'year' ? 'Year 1' : level === 'semester' ? 'Semester 1' : 'Enter name...'} className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50" />
+          <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder={level === 'year' ? 'Year 1' : level === 'semester' ? 'Semester 1' : 'Enter name...'} className="w-full rounded-xl border border-black/10 bg-black/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50" />
         </div>
         {level === 'course' && (
           <>
             <div className="grid grid-cols-2 gap-3">
-              <div><label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Course Code</label><input type="text" value={code} onChange={(e) => setCode(e.target.value)} placeholder="CS101" className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50" /></div>
-              <div><label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Professor</label><input type="text" value={professor} onChange={(e) => setProfessor(e.target.value)} placeholder="Dr. Smith" className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50" /></div>
+              <div><label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Course Code</label><input type="text" value={code} onChange={(e) => setCode(e.target.value)} placeholder="CS101" className="w-full rounded-xl border border-black/10 bg-black/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50" /></div>
+              <div><label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Professor</label><input type="text" value={professor} onChange={(e) => setProfessor(e.target.value)} placeholder="Dr. Smith" className="w-full rounded-xl border border-black/10 bg-black/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50" /></div>
             </div>
-            <div><label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Description</label><textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Brief course description..." rows={2} className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50" /></div>
+            <div><label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Description</label><textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Brief course description..." rows={2} className="w-full rounded-xl border border-black/10 bg-black/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50" /></div>
             <div><label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Color</label><div className="flex gap-2">{['#6366f1', '#10b981', '#f97316', '#0ea5e9', '#e11d48', '#e5e5e5'].map((c) => <button key={c} onClick={() => setColor(c)} className={`h-8 w-8 rounded-lg transition-transform ${color === c ? 'scale-110 ring-2 ring-white/30' : ''}`} style={{ background: c }} />)}</div></div>
           </>
         )}
-        {level === 'module' && <div><label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Description</label><textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Brief module description..." rows={2} className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50" /></div>}
+        {level === 'module' && <div><label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Description</label><textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Brief module description..." rows={2} className="w-full rounded-xl border border-black/10 bg-black/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50" /></div>}
         <div className="flex justify-end gap-3">
-          <button onClick={onClose} className="rounded-xl px-4 py-2 text-sm font-medium text-[var(--text-secondary)] hover:bg-white/5">Cancel</button>
+          <button onClick={onClose} className="rounded-xl px-4 py-2 text-sm font-medium text-[var(--text-secondary)] hover:bg-black/5">Cancel</button>
           <button onClick={handleCreate} disabled={saving} className="btn-primary px-5 py-2 text-sm">{saving ? 'Creating...' : 'Create'}</button>
         </div>
       </div>
@@ -593,29 +594,29 @@ function EditEntityModal({ data: editData, allData, onClose, onSaved }: { data: 
       <div className="space-y-4">
         <div>
           <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">{level === 'year' || level === 'semester' ? 'Label' : 'Name'}</label>
-          <input type="text" value={val} onChange={(e) => setVal(e.target.value)} className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] focus:border-[var(--accent)]/50" />
+          <input type="text" value={val} onChange={(e) => setVal(e.target.value)} className="w-full rounded-xl border border-black/10 bg-black/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] focus:border-[var(--accent)]/50" />
         </div>
         {(level === 'year' || level === 'semester') && (
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Start Date</label>
-              <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] focus:border-[var(--accent)]/50" />
+              <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full rounded-xl border border-black/10 bg-black/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] focus:border-[var(--accent)]/50" />
             </div>
             <div>
               <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">End Date</label>
-              <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] focus:border-[var(--accent)]/50" />
+              <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full rounded-xl border border-black/10 bg-black/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] focus:border-[var(--accent)]/50" />
             </div>
           </div>
         )}
         {level === 'course' && (
           <>
             <div className="grid grid-cols-2 gap-3">
-              <div><label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Course Code</label><input type="text" value={cCode} onChange={(e) => setCCode(e.target.value)} className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] focus:border-[var(--accent)]/50" /></div>
-              <div><label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Professor</label><input type="text" value={prof} onChange={(e) => setProf(e.target.value)} className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] focus:border-[var(--accent)]/50" /></div>
+              <div><label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Course Code</label><input type="text" value={cCode} onChange={(e) => setCCode(e.target.value)} className="w-full rounded-xl border border-black/10 bg-black/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] focus:border-[var(--accent)]/50" /></div>
+              <div><label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Professor</label><input type="text" value={prof} onChange={(e) => setProf(e.target.value)} className="w-full rounded-xl border border-black/10 bg-black/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] focus:border-[var(--accent)]/50" /></div>
             </div>
             <div>
               <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Semester</label>
-              <select value={semId} onChange={(e) => setSemId(e.target.value)} className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] focus:border-[var(--accent)]/50">
+              <select value={semId} onChange={(e) => setSemId(e.target.value)} className="w-full rounded-xl border border-black/10 bg-black/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] focus:border-[var(--accent)]/50">
                 <option value="">Keep current</option>
                 {availableSemesters.map((s) => {
                   const year = allData.years.find((y) => y.id === s.academic_year_id);
@@ -623,17 +624,17 @@ function EditEntityModal({ data: editData, allData, onClose, onSaved }: { data: 
                 })}
               </select>
             </div>
-            <div><label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Description</label><textarea value={desc} onChange={(e) => setDesc(e.target.value)} rows={2} className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] focus:border-[var(--accent)]/50" /></div>
+            <div><label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Description</label><textarea value={desc} onChange={(e) => setDesc(e.target.value)} rows={2} className="w-full rounded-xl border border-black/10 bg-black/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] focus:border-[var(--accent)]/50" /></div>
             <div><label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Color</label><div className="flex gap-2">{['#6366f1', '#10b981', '#f97316', '#0ea5e9', '#e11d48', '#e5e5e5'].map((c) => <button key={c} onClick={() => setColor(c)} className={`h-8 w-8 rounded-lg transition-transform ${color === c ? 'scale-110 ring-2 ring-white/30' : ''}`} style={{ background: c }} />)}</div></div>
           </>
         )}
-        {level === 'module' && <div><label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Description</label><textarea value={desc} onChange={(e) => setDesc(e.target.value)} rows={2} className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] focus:border-[var(--accent)]/50" /></div>}
+        {level === 'module' && <div><label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Description</label><textarea value={desc} onChange={(e) => setDesc(e.target.value)} rows={2} className="w-full rounded-xl border border-black/10 bg-black/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] focus:border-[var(--accent)]/50" /></div>}
         {level === 'topic' && (
           <>
-            <div><label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Description</label><textarea value={desc} onChange={(e) => setDesc(e.target.value)} rows={2} className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] focus:border-[var(--accent)]/50" /></div>
+            <div><label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Description</label><textarea value={desc} onChange={(e) => setDesc(e.target.value)} rows={2} className="w-full rounded-xl border border-black/10 bg-black/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] focus:border-[var(--accent)]/50" /></div>
             <div>
               <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Understanding Status</label>
-              <select value={status} onChange={(e) => setStatus(e.target.value)} className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] focus:border-[var(--accent)]/50">
+              <select value={status} onChange={(e) => setStatus(e.target.value)} className="w-full rounded-xl border border-black/10 bg-black/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] focus:border-[var(--accent)]/50">
                 {statusOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
               </select>
             </div>
@@ -644,7 +645,7 @@ function EditEntityModal({ data: editData, allData, onClose, onSaved }: { data: 
           </>
         )}
         <div className="flex justify-end gap-3">
-          <button onClick={onClose} className="rounded-xl px-4 py-2 text-sm font-medium text-[var(--text-secondary)] hover:bg-white/5">Cancel</button>
+          <button onClick={onClose} className="rounded-xl px-4 py-2 text-sm font-medium text-[var(--text-secondary)] hover:bg-black/5">Cancel</button>
           <button onClick={handleSave} disabled={saving} className="btn-primary px-5 py-2 text-sm">{saving ? 'Saving...' : 'Save'}</button>
         </div>
       </div>
@@ -673,8 +674,48 @@ function LogClassModal({ courses, modules, topics, defaultCourseId, onClose, onL
   const [confusions, setConfusions] = useState('');
   const [learnings, setLearnings] = useState('');
   const [saving, setSaving] = useState(false);
+  const [summarizing, setSummarizing] = useState(false);
+  const [suggestedTasks, setSuggestedTasks] = useState<{ title: string; deadline: string; priority: string; category: string }[]>([]);
+  const [addingTasks, setAddingTasks] = useState(false);
 
   const courseTopics = topics.filter((t) => { const mod = modules.find((m) => m.id === t.module_id); return mod?.course_id === selectedCourse; });
+
+  async function handleSummarize() {
+    if (!rawThoughts.trim()) { toast.show('Write your raw thoughts first.', 'error'); return; }
+    setSummarizing(true);
+    try {
+      const [summary, extraction] = await Promise.all([
+        aiProvider.summarizeClass(rawThoughts),
+        aiProvider.extractTasks(rawThoughts),
+      ]);
+      if (summary.understanding === 'low') setUnderstanding(2);
+      else if (summary.understanding === 'high') setUnderstanding(4);
+      else setUnderstanding(3);
+      if (summary.questions.length) setQuestions((prev) => [prev, ...summary.questions].filter(Boolean).join('\n'));
+      if (summary.weakAreas.length) setConfusions((prev) => [prev, ...summary.weakAreas].filter(Boolean).join('\n'));
+      if (summary.learnings.length) setLearnings((prev) => [prev, ...summary.learnings].filter(Boolean).join('\n'));
+      setSuggestedTasks(extraction.tasks);
+      toast.show(extraction.tasks.length > 0 ? `Summarized — found ${extraction.tasks.length} possible task(s).` : 'Summarized.');
+    } catch {
+      toast.show('Could not summarize right now.', 'error');
+    }
+    setSummarizing(false);
+  }
+
+  async function handleAddSuggestedTasks() {
+    if (suggestedTasks.length === 0) return;
+    setAddingTasks(true);
+    const { error } = await supabase.from('tasks').insert(suggestedTasks.map((t) => ({
+      title: t.title,
+      deadline: t.deadline ? new Date(t.deadline).toISOString() : null,
+      priority: t.priority || 'medium',
+      category: t.category || 'academic',
+      related_course_id: selectedCourse || null,
+    })));
+    setAddingTasks(false);
+    if (error) toast.show('Failed to add tasks.', 'error');
+    else { toast.show(`${suggestedTasks.length} task(s) added.`); setSuggestedTasks([]); }
+  }
 
   async function handleLog() {
     if (!selectedCourse) { toast.show('Please select a course.', 'error'); return; }
@@ -699,7 +740,7 @@ function LogClassModal({ courses, modules, topics, defaultCourseId, onClose, onL
       <div className="space-y-4">
         <div>
           <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Course</label>
-          <select value={selectedCourse} onChange={(e) => { setSelectedCourse(e.target.value); setSelectedTopic(''); }} className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] focus:border-[var(--accent)]/50">
+          <select value={selectedCourse} onChange={(e) => { setSelectedCourse(e.target.value); setSelectedTopic(''); }} className="w-full rounded-xl border border-black/10 bg-black/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] focus:border-[var(--accent)]/50">
             <option value="">Select a course...</option>
             {courses.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
@@ -707,25 +748,50 @@ function LogClassModal({ courses, modules, topics, defaultCourseId, onClose, onL
         {selectedCourse && courseTopics.length > 0 && (
           <div>
             <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Topic (optional)</label>
-            <select value={selectedTopic} onChange={(e) => setSelectedTopic(e.target.value)} className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] focus:border-[var(--accent)]/50">
+            <select value={selectedTopic} onChange={(e) => setSelectedTopic(e.target.value)} className="w-full rounded-xl border border-black/10 bg-black/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] focus:border-[var(--accent)]/50">
               <option value="">No specific topic...</option>
               {courseTopics.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
             </select>
           </div>
         )}
-        <div><label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Title (optional)</label><input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Lecture on Hypothesis Testing" className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50" /></div>
-        <div><label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Your raw thoughts</label><textarea value={rawThoughts} onChange={(e) => setRawThoughts(e.target.value)} placeholder="Just talk naturally. What happened? What did you learn? What confused you?" rows={5} className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50" /><p className="mt-1 text-xs text-[var(--text-secondary)]/60">Your original words are preserved forever.</p></div>
+        <div><label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Title (optional)</label><input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Lecture on Hypothesis Testing" className="w-full rounded-xl border border-black/10 bg-black/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50" /></div>
+        <div>
+          <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Your raw thoughts</label>
+          <textarea value={rawThoughts} onChange={(e) => setRawThoughts(e.target.value)} placeholder="Just talk naturally. What happened? What did you learn? What confused you?" rows={5} className="w-full rounded-xl border border-black/10 bg-black/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50" />
+          <div className="mt-1.5 flex items-center justify-between">
+            <p className="text-xs text-[var(--text-secondary)]/60">Your original words are preserved forever.</p>
+            <button type="button" onClick={handleSummarize} disabled={summarizing || !rawThoughts.trim()} className="flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium text-[var(--accent-secondary)] hover:bg-[var(--accent)]/10 disabled:opacity-40">
+              <Sparkles size={12} /> {summarizing ? 'Summarizing...' : 'Summarize with AI'}
+            </button>
+          </div>
+        </div>
+        {suggestedTasks.length > 0 && (
+          <div className="rounded-xl border border-[var(--accent)]/15 bg-[var(--accent)]/5 p-3">
+            <p className="mb-2 flex items-center gap-1.5 text-xs font-medium text-[var(--accent-secondary)]"><CheckSquare size={12} /> AI found {suggestedTasks.length} possible task(s) — review before adding</p>
+            <ul className="mb-2 space-y-1">
+              {suggestedTasks.map((t, i) => (
+                <li key={i} className="text-xs text-[var(--text-primary)]">• {t.title}{t.deadline ? ` — ${t.deadline}` : ''}</li>
+              ))}
+            </ul>
+            <div className="flex gap-2">
+              <button type="button" onClick={handleAddSuggestedTasks} disabled={addingTasks} className="rounded-lg bg-[var(--accent)]/15 px-2.5 py-1 text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--accent)]/25">
+                {addingTasks ? 'Adding...' : `Add ${suggestedTasks.length} task(s)`}
+              </button>
+              <button type="button" onClick={() => setSuggestedTasks([])} className="rounded-lg px-2.5 py-1 text-xs font-medium text-[var(--text-secondary)] hover:bg-black/5">Dismiss</button>
+            </div>
+          </div>
+        )}
         <div className="grid grid-cols-2 gap-4">
           <div><label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Understanding: {understanding}/5</label><input type="range" min={1} max={5} value={understanding} onChange={(e) => setUnderstanding(Number(e.target.value))} className="w-full accent-[var(--accent)]" /></div>
           <div><label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Usefulness: {usefulness}/5</label><input type="range" min={1} max={5} value={usefulness} onChange={(e) => setUsefulness(Number(e.target.value))} className="w-full accent-[var(--accent)]" /></div>
         </div>
         <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-          <div><label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Questions</label><textarea value={questions} onChange={(e) => setQuestions(e.target.value)} rows={3} placeholder="What is..." className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50" /></div>
-          <div><label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Confusions</label><textarea value={confusions} onChange={(e) => setConfusions(e.target.value)} rows={3} placeholder="I didn't get..." className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50" /></div>
-          <div><label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Learnings</label><textarea value={learnings} onChange={(e) => setLearnings(e.target.value)} rows={3} placeholder="I learned..." className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50" /></div>
+          <div><label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Questions</label><textarea value={questions} onChange={(e) => setQuestions(e.target.value)} rows={3} placeholder="What is..." className="w-full rounded-xl border border-black/10 bg-black/[0.03] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50" /></div>
+          <div><label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Confusions</label><textarea value={confusions} onChange={(e) => setConfusions(e.target.value)} rows={3} placeholder="I didn't get..." className="w-full rounded-xl border border-black/10 bg-black/[0.03] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50" /></div>
+          <div><label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Learnings</label><textarea value={learnings} onChange={(e) => setLearnings(e.target.value)} rows={3} placeholder="I learned..." className="w-full rounded-xl border border-black/10 bg-black/[0.03] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50" /></div>
         </div>
         <div className="flex justify-end gap-3">
-          <button onClick={onClose} className="rounded-xl px-4 py-2 text-sm font-medium text-[var(--text-secondary)] hover:bg-white/5">Cancel</button>
+          <button onClick={onClose} className="rounded-xl px-4 py-2 text-sm font-medium text-[var(--text-secondary)] hover:bg-black/5">Cancel</button>
           <button onClick={handleLog} disabled={saving} className="btn-primary px-5 py-2 text-sm">{saving ? 'Saving...' : 'Log Class'}</button>
         </div>
       </div>

@@ -16,14 +16,14 @@ export function Modal({ open, onClose, title, children, maxWidth = '500px' }: Mo
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-fade-in" onClick={onClose} />
       <div
-        className="relative z-10 w-full overflow-hidden rounded-2xl border border-white/10 bg-[var(--bg-secondary)] shadow-2xl animate-scale-in"
+        className="relative z-10 w-full overflow-hidden rounded-2xl border border-black/10 bg-[var(--bg-secondary)] shadow-2xl animate-scale-in"
         style={{ maxWidth }}
       >
-        <div className="flex items-center justify-between border-b border-white/5 px-5 py-4">
+        <div className="flex items-center justify-between border-b border-black/8 px-5 py-4">
           <h2 className="font-display text-lg font-semibold text-[var(--text-primary)]">{title}</h2>
           <button
             onClick={onClose}
-            className="rounded-lg p-1.5 text-[var(--text-secondary)] transition-colors hover:bg-white/5 hover:text-[var(--text-primary)]"
+            className="rounded-lg p-1.5 text-[var(--text-secondary)] transition-colors hover:bg-black/5 hover:text-[var(--text-primary)]"
           >
             <X size={18} />
           </button>
@@ -67,7 +67,7 @@ export function ConfirmModal({
       <div className="flex justify-end gap-3">
         <button
           onClick={onClose}
-          className="rounded-xl px-4 py-2 text-sm font-medium text-[var(--text-secondary)] transition-colors hover:bg-white/5"
+          className="rounded-xl px-4 py-2 text-sm font-medium text-[var(--text-secondary)] transition-colors hover:bg-black/5"
         >
           Cancel
         </button>

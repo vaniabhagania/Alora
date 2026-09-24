@@ -46,9 +46,9 @@ export function AppearanceEditor({ world, onClose, onUpdate }: AppearanceEditorP
 
   return (
     <div className="world-side-panel" onClick={(e) => e.stopPropagation()}>
-      <div className="sticky top-0 z-10 flex items-center justify-between border-b border-white/5 bg-[var(--bg-secondary)]/95 px-5 py-4 backdrop-blur-xl">
-        <h2 className="font-display text-lg font-semibold text-[var(--text-primary)]">Appearance</h2>
-        <button onClick={onClose} className="rounded-lg p-1.5 text-[var(--text-secondary)] hover:bg-white/5">
+      <div className="sticky top-0 z-10 flex items-center justify-between border-b border-white/5 bg-black/40 px-5 py-4 backdrop-blur-xl">
+        <h2 className="font-display text-lg font-semibold text-white">Appearance</h2>
+        <button onClick={onClose} className="rounded-lg p-1.5 text-white/60 hover:bg-white/5">
           <X size={18} />
         </button>
       </div>
@@ -58,7 +58,7 @@ export function AppearanceEditor({ world, onClose, onUpdate }: AppearanceEditorP
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
-            className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${tab === t.id ? 'bg-[var(--accent)]/15 text-[var(--text-primary)]' : 'text-[var(--text-secondary)] hover:bg-white/5'}`}
+            className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${tab === t.id ? 'bg-[var(--accent)]/15 text-white' : 'text-white/60 hover:bg-white/5'}`}
           >
             {t.label}
           </button>
@@ -72,7 +72,7 @@ export function AppearanceEditor({ world, onClose, onUpdate }: AppearanceEditorP
               <select
                 value={settings.background.type}
                 onChange={(e) => update('background.type', e.target.value)}
-                className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-[var(--text-primary)]"
+                className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-white"
               >
                 <option value="solid">Solid</option>
                 <option value="gradient">Gradient</option>
@@ -92,7 +92,7 @@ export function AppearanceEditor({ world, onClose, onUpdate }: AppearanceEditorP
               <select
                 value={settings.background.texture}
                 onChange={(e) => update('background.texture', e.target.value)}
-                className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-[var(--text-primary)]"
+                className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-white"
               >
                 <option value="none">None</option>
                 <option value="grain">Grain</option>
@@ -105,16 +105,16 @@ export function AppearanceEditor({ world, onClose, onUpdate }: AppearanceEditorP
         {tab === 'surfaces' && (
           <>
             <Field label="Card Background">
-              <input type="text" value={settings.surfaces.cardBg} onChange={(e) => update('surfaces.cardBg', e.target.value)} className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-[var(--text-primary)]" />
+              <input type="text" value={settings.surfaces.cardBg} onChange={(e) => update('surfaces.cardBg', e.target.value)} className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-white" />
             </Field>
             <Field label="Sidebar Background">
-              <input type="text" value={settings.surfaces.sidebarBg} onChange={(e) => update('surfaces.sidebarBg', e.target.value)} className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-[var(--text-primary)]" />
+              <input type="text" value={settings.surfaces.sidebarBg} onChange={(e) => update('surfaces.sidebarBg', e.target.value)} className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-white" />
             </Field>
             <Field label="Modal Background">
-              <input type="text" value={settings.surfaces.modalBg} onChange={(e) => update('surfaces.modalBg', e.target.value)} className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-[var(--text-primary)]" />
+              <input type="text" value={settings.surfaces.modalBg} onChange={(e) => update('surfaces.modalBg', e.target.value)} className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-white" />
             </Field>
             <Field label="Chat Background">
-              <input type="text" value={settings.surfaces.chatBg} onChange={(e) => update('surfaces.chatBg', e.target.value)} className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-[var(--text-primary)]" />
+              <input type="text" value={settings.surfaces.chatBg} onChange={(e) => update('surfaces.chatBg', e.target.value)} className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-white" />
             </Field>
           </>
         )}
@@ -137,19 +137,19 @@ export function AppearanceEditor({ world, onClose, onUpdate }: AppearanceEditorP
         {tab === 'typography' && (
           <>
             <Field label="Display Font">
-              <select value={settings.typography.displayFont} onChange={(e) => update('typography.displayFont', e.target.value)} className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-[var(--text-primary)]">
+              <select value={settings.typography.displayFont} onChange={(e) => update('typography.displayFont', e.target.value)} className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-white">
                 {FONT_OPTIONS.map((f) => <option key={f.value} value={f.value}>{f.label}</option>)}
               </select>
-              <p className="mt-2 font-display text-xl font-bold text-[var(--text-primary)]" style={{ fontFamily: settings.typography.displayFont }}>The quick brown fox</p>
+              <p className="mt-2 font-display text-xl font-bold text-white" style={{ fontFamily: settings.typography.displayFont }}>The quick brown fox</p>
             </Field>
             <Field label="Body Font">
-              <select value={settings.typography.bodyFont} onChange={(e) => update('typography.bodyFont', e.target.value)} className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-[var(--text-primary)]">
+              <select value={settings.typography.bodyFont} onChange={(e) => update('typography.bodyFont', e.target.value)} className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-white">
                 {FONT_OPTIONS.map((f) => <option key={f.value} value={f.value}>{f.label}</option>)}
               </select>
-              <p className="mt-2 text-sm text-[var(--text-primary)]" style={{ fontFamily: settings.typography.bodyFont }}>The quick brown fox jumps over the lazy dog.</p>
+              <p className="mt-2 text-sm text-white" style={{ fontFamily: settings.typography.bodyFont }}>The quick brown fox jumps over the lazy dog.</p>
             </Field>
             <Field label="Accent Font">
-              <select value={settings.typography.accentFont} onChange={(e) => update('typography.accentFont', e.target.value)} className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-[var(--text-primary)]">
+              <select value={settings.typography.accentFont} onChange={(e) => update('typography.accentFont', e.target.value)} className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-white">
                 {FONT_OPTIONS.map((f) => <option key={f.value} value={f.value}>{f.label}</option>)}
               </select>
             </Field>
@@ -179,7 +179,7 @@ export function AppearanceEditor({ world, onClose, onUpdate }: AppearanceEditorP
         )}
       </div>
 
-      <div className="sticky bottom-0 border-t border-white/5 bg-[var(--bg-secondary)]/95 p-4 backdrop-blur-xl">
+      <div className="sticky bottom-0 border-t border-white/5 bg-black/40 p-4 backdrop-blur-xl">
         <button onClick={onClose} className="btn-primary w-full py-2.5 text-sm">Done</button>
       </div>
     </div>
@@ -189,7 +189,7 @@ export function AppearanceEditor({ world, onClose, onUpdate }: AppearanceEditorP
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">{label}</label>
+      <label className="mb-1.5 block text-xs font-medium text-white/60">{label}</label>
       {children}
     </div>
   );
@@ -198,10 +198,10 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 function ColorField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
   return (
     <div>
-      <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">{label}</label>
+      <label className="mb-1.5 block text-xs font-medium text-white/60">{label}</label>
       <div className="flex gap-2">
         <input type="color" value={value.startsWith('#') ? value : '#000000'} onChange={(e) => onChange(e.target.value)} className="h-9 w-12 shrink-0 rounded-lg border border-white/10" />
-        <input type="text" value={value} onChange={(e) => onChange(e.target.value)} className="flex-1 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-[var(--text-primary)]" />
+        <input type="text" value={value} onChange={(e) => onChange(e.target.value)} className="flex-1 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-white" />
       </div>
     </div>
   );
@@ -210,7 +210,7 @@ function ColorField({ label, value, onChange }: { label: string; value: string; 
 function ToggleField({ label, value, onChange }: { label: string; value: boolean; onChange: (v: boolean) => void }) {
   return (
     <label className="flex items-center justify-between">
-      <span className="text-sm text-[var(--text-primary)]">{label}</span>
+      <span className="text-sm text-white">{label}</span>
       <button onClick={() => onChange(!value)} className={`relative h-6 w-11 rounded-full transition-colors ${value ? 'bg-[var(--accent)]' : 'bg-white/10'}`}>
         <span className={`absolute top-1 h-4 w-4 rounded-full bg-white transition-transform ${value ? 'left-6' : 'left-1'}`} />
       </button>

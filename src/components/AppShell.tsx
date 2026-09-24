@@ -28,7 +28,7 @@ export function AppShell({ currentPage, onNavigate, children }: AppShellProps) {
 
       {/* Desktop sidebar */}
       <aside
-        className={`hidden md:flex flex-col shrink-0 border-r border-white/5 bg-[var(--bg-secondary)]/60 backdrop-blur-xl transition-all duration-300 ${
+        className={`hidden md:flex flex-col shrink-0 border-r border-black/8 bg-[var(--bg-secondary)]/60 backdrop-blur-xl transition-all duration-300 ${
           collapsed ? 'w-[72px]' : 'w-[240px]'
         }`}
       >
@@ -58,7 +58,7 @@ export function AppShell({ currentPage, onNavigate, children }: AppShellProps) {
                 className={`group mb-1 flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-all ${
                   active
                     ? 'bg-[var(--accent)]/15 text-[var(--text-primary)]'
-                    : 'text-[var(--text-secondary)] hover:bg-white/5 hover:text-[var(--text-primary)]'
+                    : 'text-[var(--text-secondary)] hover:bg-black/5 hover:text-[var(--text-primary)]'
                 }`}
                 title={item.label}
               >
@@ -75,11 +75,11 @@ export function AppShell({ currentPage, onNavigate, children }: AppShellProps) {
           })}
         </nav>
 
-        <div className="border-t border-white/5 px-3 py-3">
+        <div className="border-t border-black/8 px-3 py-3">
           {!collapsed && activeWorld && (
             <button
               onClick={() => onNavigate('worlds')}
-              className="mb-2 flex w-full items-center gap-2.5 rounded-xl px-3 py-2 transition-colors hover:bg-white/5"
+              className="mb-2 flex w-full items-center gap-2.5 rounded-xl px-3 py-2 transition-colors hover:bg-black/5"
             >
               <div
                 className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg"
@@ -109,7 +109,7 @@ export function AppShell({ currentPage, onNavigate, children }: AppShellProps) {
           )}
           <button
             onClick={() => setCollapsed(!collapsed)}
-            className="hidden w-full items-center justify-center rounded-xl px-3 py-2 text-xs text-[var(--text-secondary)] hover:bg-white/5 hover:text-[var(--text-primary)]"
+            className="hidden w-full items-center justify-center rounded-xl px-3 py-2 text-xs text-[var(--text-secondary)] hover:bg-black/5 hover:text-[var(--text-primary)]"
           >
             {collapsed ? '→' : '← Collapse'}
           </button>
@@ -134,7 +134,7 @@ export function AppShell({ currentPage, onNavigate, children }: AppShellProps) {
       </div>
 
       {/* Mobile bottom nav */}
-      <nav className="fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around border-t border-white/10 bg-[var(--bg-secondary)]/90 backdrop-blur-xl md:hidden">
+      <nav className="fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around border-t border-black/10 bg-[var(--bg-secondary)]/90 backdrop-blur-xl md:hidden">
         {NAV_ITEMS.slice(0, 5).map((item) => {
           const Icon = item.icon;
           const active = currentPage === item.id;
@@ -154,7 +154,7 @@ export function AppShell({ currentPage, onNavigate, children }: AppShellProps) {
       </nav>
 
       {/* Mobile "more" nav — accessible via a second row */}
-      <div className="fixed bottom-0 left-0 right-0 z-40 flex items-center justify-around border-t border-white/5 bg-[var(--bg-secondary)]/95 backdrop-blur-xl md:hidden" style={{ bottom: '56px', display: currentPage === 'more' ? 'flex' : 'none' }}>
+      <div className="fixed bottom-0 left-0 right-0 z-40 flex items-center justify-around border-t border-black/8 bg-[var(--bg-secondary)]/95 backdrop-blur-xl md:hidden" style={{ bottom: '56px', display: currentPage === 'more' ? 'flex' : 'none' }}>
         {NAV_ITEMS.slice(5).map((item) => {
           const Icon = item.icon;
           const active = currentPage === item.id;

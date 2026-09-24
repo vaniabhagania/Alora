@@ -318,7 +318,7 @@ export function WorldEditor({ world, onBack }: WorldEditorProps) {
               Start with a photo, a quote, a color, a memory — or absolutely nothing but a feeling.
             </p>
             <button
-              onClick={(e) => { e.stopPropagation(); setAddMenu(true); }}
+              onClick={(e) => { e.stopPropagation(); setAddDialog('text'); }}
               className="flex items-center gap-2 rounded-full border px-6 py-3 text-sm font-medium transition-all hover:scale-105"
               style={{ borderColor: ts.colors.accent + '40', color: ts.colors.textPrimary, background: ts.colors.accent + '10' }}
             >

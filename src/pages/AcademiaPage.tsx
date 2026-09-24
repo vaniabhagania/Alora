@@ -55,7 +55,7 @@ export function AcademiaPage() {
             key={tab.id}
             onClick={() => setView(tab.id)}
             className={`flex shrink-0 items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition-colors ${
-              view === tab.id ? 'bg-[var(--accent)]/15 text-[var(--text-primary)]' : 'text-[var(--text-secondary)] hover:bg-white/5'
+              view === tab.id ? 'bg-[var(--accent)]/15 text-[var(--text-primary)]' : 'text-[var(--text-secondary)] hover:bg-black/5'
             }`}
           >
             {tab.icon} {tab.label}

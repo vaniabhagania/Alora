@@ -4,10 +4,10 @@ import { useAuth } from '@/lib/auth';
 import { useToast } from '@/lib/toast';
 import { aiProvider } from '@/lib/ai/provider';
 import type { AIQuizQuestion } from '@/lib/ai/types';
-import type { QuizAttempt, QuizQuestion, Course, Topic, ClassSession, ClassLog } from '@/lib/types';
+import type { QuizAttempt, Topic, ClassSession, ClassLog } from '@/lib/types';
 import { cascadeQuizResults } from '@/lib/brain/cascade';
 import { EmptyState, LoadingSpinner, ProgressRing } from '@/components/ui';
-import { Brain, CheckCircle2, XCircle, Plus, Lightbulb, TrendingUp, RotateCcw } from 'lucide-react';
+import { Brain, CheckCircle2, XCircle, Lightbulb, TrendingUp, RotateCcw } from 'lucide-react';
 
 type QuizState = 'idle' | 'generating' | 'active' | 'results';
 
@@ -20,7 +20,6 @@ export function QuizPage() {
   const [answers, setAnswers] = useState<Record<number, string>>({});
   const [loading, setLoading] = useState(true);
   const [attempts, setAttempts] = useState<QuizAttempt[]>([]);
-  const [courses, setCourses] = useState<Course[]>([]);
   const [topics, setTopics] = useState<Topic[]>([]);
   const [recentClasses, setRecentClasses] = useState<ClassSession[]>([]);
   const [classLogs, setClassLogs] = useState<ClassLog[]>([]);
@@ -28,15 +27,13 @@ export function QuizPage() {
   const loadData = useCallback(async () => {
     if (!profile) return;
     setLoading(true);
-    const [a, c, t, cl, clg] = await Promise.all([
+    const [a, t, cl, clg] = await Promise.all([
       supabase.from('quiz_attempts').select('*').order('completed_at', { ascending: false }).limit(10),
-      supabase.from('courses').select('*').limit(20),
       supabase.from('topics').select('*').limit(50),
       supabase.from('classes').select('*').order('session_date', { ascending: false }).limit(10),
       supabase.from('class_logs').select('*').order('created_at', { ascending: false }).limit(10),
     ]);
     setAttempts((a.data as QuizAttempt[]) || []);
-    setCourses((c.data as Course[]) || []);
     setTopics((t.data as Topic[]) || []);
     setRecentClasses((cl.data as ClassSession[]) || []);
     setClassLogs((clg.data as ClassLog[]) || []);
@@ -233,7 +230,7 @@ export function QuizPage() {
           <h1 className="font-display text-lg font-bold text-[var(--text-primary)]">Question {currentQ + 1} of {questions.length}</h1>
           <span className="text-xs text-[var(--text-secondary)]">{q.topic} · {q.difficulty}</span>
         </div>
-        <div className="mb-6 h-1.5 w-full overflow-hidden rounded-full bg-white/5">
+        <div className="mb-6 h-1.5 w-full overflow-hidden rounded-full bg-black/5">
           <div className="h-full rounded-full transition-all" style={{ width: `${((currentQ + 1) / questions.length) * 100}%`, background: 'linear-gradient(90deg, var(--accent), var(--accent-secondary))' }} />
         </div>
         <div className="glass-card mb-6 p-6">
@@ -247,7 +244,7 @@ export function QuizPage() {
                   className={`w-full rounded-xl border px-4 py-3 text-left text-sm transition-all ${
                     answers[currentQ] === opt
                       ? 'border-[var(--accent)] bg-[var(--accent)]/15 text-[var(--text-primary)]'
-                      : 'border-white/10 bg-white/[0.02] text-[var(--text-secondary)] hover:border-white/20 hover:text-[var(--text-primary)]'
+                      : 'border-black/10 bg-black/[0.02] text-[var(--text-secondary)] hover:border-black/15 hover:text-[var(--text-primary)]'
                   }`}
                 >
                   {opt}
@@ -260,13 +257,13 @@ export function QuizPage() {
               onChange={(e) => setAnswers((prev) => ({ ...prev, [currentQ]: e.target.value }))}
               placeholder="Type your answer..."
               rows={4}
-              className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50"
+              className="w-full rounded-xl border border-black/10 bg-black/[0.03] px-4 py-3 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50"
             />
           )}
         </div>
         <div className="flex justify-between">
           {currentQ > 0 ? (
-            <button onClick={() => setCurrentQ((prev) => prev - 1)} className="rounded-xl border border-white/10 px-5 py-2.5 text-sm font-medium text-[var(--text-secondary)] hover:bg-white/5">Previous</button>
+            <button onClick={() => setCurrentQ((prev) => prev - 1)} className="rounded-xl border border-black/10 px-5 py-2.5 text-sm font-medium text-[var(--text-secondary)] hover:bg-black/5">Previous</button>
           ) : <div />}
           {currentQ < questions.length - 1 ? (
             <button onClick={() => setCurrentQ((prev) => prev + 1)} disabled={!answers[currentQ]} className="btn-primary px-5 py-2.5 text-sm disabled:opacity-40">Next</button>
@@ -355,7 +352,7 @@ function MixBar({ label, pct }: { label: string; pct: number }) {
         <span className="text-[var(--text-secondary)]">{label}</span>
         <span className="text-[var(--text-primary)]">{pct}%</span>
       </div>
-      <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/5">
+      <div className="h-1.5 w-full overflow-hidden rounded-full bg-black/5">
         <div className="h-full rounded-full" style={{ width: `${pct}%`, background: 'linear-gradient(90deg, var(--accent), var(--accent-secondary))' }} />
       </div>
     </div>
