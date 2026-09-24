@@ -10,6 +10,7 @@ import {
   type Level, type EditModalData, type DeleteTarget, LogClassModal,
 } from '@/components/academia/AcademiaHierarchy';
 import { AttachmentList } from '@/components/AttachmentList';
+import { AskAlora } from '@/components/AskAlora';
 import { ArrowLeft, BookOpen, FileText, Brain, Clock, AlertTriangle, TrendingUp, GraduationCap, CheckCircle2, Plus, Pencil, Trash2 } from 'lucide-react';
 
 interface Props {
@@ -90,6 +91,20 @@ export function CourseView({ courseId, data, onBack, reload }: Props) {
           </div>
         </div>
         {course.description && <p className="mt-3 text-sm text-[var(--text-secondary)]">{course.description}</p>}
+      </div>
+
+      <div className="mb-6">
+        <AskAlora
+          contextLabel={course.name}
+          source="course-view"
+          contextText={[
+            `Course: ${course.name}${course.professor ? ` (taught by ${course.professor})` : ''}`,
+            courseModules.length ? `Modules: ${courseModules.map((m) => m.name).join(', ')}` : '',
+            courseTopics.length ? `Topics: ${courseTopics.map((t) => `${t.name} (${STATUS_LABELS[t.status]}, ${t.confidence}% confidence)`).join('; ')}` : '',
+            weakTopics.length ? `Weak topics: ${weakTopics.map((t) => t.name).join(', ')}` : '',
+            courseClasses.length ? `Recent classes: ${courseClasses.slice(0, 5).map((c) => c.title).join(', ')}` : '',
+          ].filter(Boolean).join('\n')}
+        />
       </div>
 
       <div className="mb-6 flex gap-2 overflow-x-auto pb-1">

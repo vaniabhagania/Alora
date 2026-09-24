@@ -9,6 +9,7 @@ import type { AIReflection } from '@/lib/ai/types';
 import { Modal, ConfirmModal } from '@/components/Modal';
 import { EmptyState, Skeleton } from '@/components/ui';
 import { AttachmentList } from '@/components/AttachmentList';
+import { AskAlora } from '@/components/AskAlora';
 import { Plus, BookOpen, Trash2, BookMarked, Smile, Calendar, Sparkles, Pencil } from 'lucide-react';
 
 const MOODS = ['great', 'good', 'okay', 'low', 'rough'];
@@ -169,6 +170,9 @@ export function JournalPage() {
               )}
               <div className="mt-3">
                 <AttachmentList entityType="journal_entry" entityId={entry.id} />
+              </div>
+              <div className="mt-3">
+                <AskAlora contextLabel="this journal entry" source="journal" contextText={entry.content} />
               </div>
             </div>
           ))}

@@ -7,6 +7,7 @@ import type { NovelProject, NovelChapter, NovelScene, JournalEntry } from '@/lib
 import type { AINovelCuration } from '@/lib/ai/types';
 import { Modal, ConfirmModal } from '@/components/Modal';
 import { EmptyState, Skeleton } from '@/components/ui';
+import { AskAlora } from '@/components/AskAlora';
 import { Plus, BookA, Trash2, ChevronRight, ChevronDown, BookMarked, Sparkles, FileText, Pencil } from 'lucide-react';
 
 export function NovelPage() {
@@ -124,6 +125,17 @@ export function NovelPage() {
                 {isExpanded && (
                   <div className="ml-6 border-l border-ink/8 pl-2">
                     {project.description && <p className="px-4 py-2 text-sm text-[var(--text-secondary)]">{project.description}</p>}
+                    <div className="px-4 pb-3">
+                      <AskAlora
+                        contextLabel={project.title}
+                        source="novel"
+                        contextText={[
+                          `Novel: ${project.title}${project.themes.length ? ` — themes: ${project.themes.join(', ')}` : ''}`,
+                          project.description,
+                          ...projectChapters.map((c) => `Chapter "${c.title}": ${c.summary}`),
+                        ].filter(Boolean).join('\n')}
+                      />
+                    </div>
                     {projectChapters.length === 0 ? (
                       <p className="px-4 py-3 text-sm text-[var(--text-secondary)]">No chapters yet. Add your first chapter to start writing.</p>
                     ) : (

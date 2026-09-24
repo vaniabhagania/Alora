@@ -2,8 +2,8 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { useAuth } from '@/lib/auth';
 import { useSettings } from '@/lib/settingsContext';
 import { aiProvider } from '@/lib/ai/provider';
-import type { ChatMessage, ChatContext } from '@/lib/ai/types';
-import { getStudentContext } from '@/lib/brain';
+import type { ChatMessage } from '@/lib/ai/types';
+import { buildChatContext } from '@/lib/ai/buildContext';
 import { detectNavIntent, type NavIntent } from '@/lib/nav';
 import { useToast } from '@/lib/toast';
 import { Send, Sparkles, LayoutGrid, X, ImagePlus } from 'lucide-react';
@@ -37,31 +37,7 @@ export function ChatPage() {
   // Sourced from the unified brain (src/lib/brain) rather than ad hoc
   // queries, so chat sees exactly the same picture of the user as every
   // other feature — one brain, one memory.
-  const loadContext = useCallback(async (): Promise<ChatContext> => {
-    if (!profile) {
-      return { userName: '', recentClasses: [], upcomingTasks: [], overdueTasks: [], weakTopics: [], strongTopics: [], goals: [], identities: [], streak: 0, quizAvgScore: 0 };
-    }
-
-    const ctx = await getStudentContext('chat');
-    const courseNameById = new Map(ctx.courses.map((c) => [c.id, c.name]));
-
-    return {
-      userName: profile.display_name || 'there',
-      recentClasses: ctx.recentClasses.slice(0, 10).map((c) => ({
-        course: courseNameById.get(c.course_id) || 'Unknown',
-        title: c.title,
-        date: c.session_date,
-      })),
-      upcomingTasks: ctx.upcomingTasks.slice(0, 5).map((t) => ({ title: t.title, deadline: t.deadline!, priority: t.priority })),
-      overdueTasks: ctx.overdueTasks.map((t) => ({ title: t.title, deadline: t.deadline! })),
-      weakTopics: ctx.weakTopics.map((w) => w.name),
-      strongTopics: ctx.strongTopics,
-      goals: ctx.activeGoals.map((g) => ({ title: g.title, progress: g.progress })),
-      identities: ctx.identities.map((i) => ({ name: i.name, progress: i.progress })),
-      streak: ctx.streak,
-      quizAvgScore: ctx.quizAverage,
-    };
-  }, [profile]);
+  const loadContext = useCallback(() => buildChatContext(profile, 'chat'), [profile]);
 
   useEffect(() => {
     if (messages.length === 0) {
