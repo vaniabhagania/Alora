@@ -24,23 +24,34 @@ export class RemoteAIProvider implements AIProvider {
   constructor(private local: AIProvider) {}
 
   async chat(messages: ChatMessage[], context: ChatContext): Promise<AIChatResponse> {
-    try {
-      const { data, error } = await supabase.functions.invoke('alora-chat', {
-        body: { messages, context },
-      });
+    // Gemini's free tier throws transient 503 "high demand" errors fairly
+    // often, in bursts that can outlast a single quick retry — three
+    // attempts with backoff clears most of them before giving up and
+    // degrading to the local rule-based reply.
+    const backoffMs = [1200, 2500];
+    for (let attempt = 0; attempt <= backoffMs.length; attempt++) {
+      try {
+        const { data, error } = await supabase.functions.invoke('alora-chat', {
+          body: { messages, context },
+        });
 
-      if (error) throw error;
-      if (!data || typeof data.message !== 'string') throw new Error('Malformed response from alora-chat');
+        if (error) throw error;
+        if (!data || typeof data.message !== 'string') throw new Error('Malformed response from alora-chat');
 
-      return {
-        message: data.message,
-        insights: Array.isArray(data.insights) ? data.insights : [],
-        suggestedActions: Array.isArray(data.suggestedActions) ? data.suggestedActions : [],
-      };
-    } catch (err) {
-      console.warn('alora-chat unavailable, falling back to local provider:', err);
-      return this.local.chat(messages, context);
+        return {
+          message: data.message,
+          insights: Array.isArray(data.insights) ? data.insights : [],
+          suggestedActions: Array.isArray(data.suggestedActions) ? data.suggestedActions : [],
+        };
+      } catch (err) {
+        if (attempt < backoffMs.length) {
+          await new Promise((r) => setTimeout(r, backoffMs[attempt]));
+          continue;
+        }
+        console.warn('alora-chat unavailable, falling back to local provider:', err);
+      }
     }
+    return this.local.chat(messages, context);
   }
 
   generateQuiz(...args: Parameters<AIProvider['generateQuiz']>) {

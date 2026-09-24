@@ -2,7 +2,16 @@ import { useState } from 'react';
 import { useAuth } from '@/lib/auth';
 import { aiProvider } from '@/lib/ai/provider';
 import { buildChatContext } from '@/lib/ai/buildContext';
-import { Sparkles, Send, ChevronDown, ChevronUp } from 'lucide-react';
+import {
+  listAttachments, getAttachmentUrl, isImageType, isPdfType, isTextType,
+  fetchAttachmentBase64, fetchAttachmentText, type EntityType,
+} from '@/lib/attachments';
+import { Sparkles, Send, ChevronDown, ChevronUp, Paperclip } from 'lucide-react';
+
+interface AttachmentRef {
+  entityType: EntityType;
+  entityId: string;
+}
 
 interface Props {
   /** What this box is scoped to, e.g. "Linear Algebra" or "this journal entry". Shown in the placeholder. */
@@ -11,15 +20,23 @@ interface Props {
   contextText: string;
   /** Source tag passed through to the unified brain, purely for logging/debugging which surface asked. */
   source: string;
+  /** Entities whose attached files (images, PDFs, text) should be read when answering. */
+  attachmentRefs?: AttachmentRef[];
 }
+
+const MAX_ATTACHMENTS_READ = 6;
+const MAX_TEXT_CHARS = 4000;
 
 /**
  * A lightweight per-page "ask Alora about this" box — one question, one
  * answer, no thread. For an ongoing conversation people already have the
  * full Alora Chat page; this is for a quick grounded question without
- * leaving where they are.
+ * leaving where they are. When attachmentRefs are given, any images/PDFs
+ * attached to those entities are sent to Gemini as real multimodal input,
+ * and text files are read and included directly — Alora actually reads
+ * what's attached instead of just knowing a filename exists.
  */
-export function AskAlora({ contextLabel, contextText, source }: Props) {
+export function AskAlora({ contextLabel, contextText, source, attachmentRefs }: Props) {
   const { profile } = useAuth();
   const [open, setOpen] = useState(false);
   const [question, setQuestion] = useState('');
@@ -32,10 +49,37 @@ export function AskAlora({ contextLabel, contextText, source }: Props) {
     setAnswer(null);
     try {
       const context = await buildChatContext(profile, source);
-      const prompt = contextText
-        ? `Regarding ${contextLabel}:\n"""\n${contextText.slice(0, 4000)}\n"""\n\nQuestion: ${question.trim()}`
-        : question.trim();
-      const res = await aiProvider.chat([{ role: 'user', content: prompt }], context);
+      const fileAttachments: { mimeType: string; data: string; name?: string }[] = [];
+      let fileTextContext = '';
+
+      if (attachmentRefs?.length) {
+        const lists = await Promise.all(attachmentRefs.map((r) => listAttachments(r.entityType, r.entityId)));
+        const files = lists.flat().slice(0, MAX_ATTACHMENTS_READ);
+        for (const f of files) {
+          const url = await getAttachmentUrl(f.storage_path);
+          if (!url) continue;
+          if (isImageType(f.file_type) || isPdfType(f.file_type)) {
+            try {
+              const data = await fetchAttachmentBase64(url);
+              fileAttachments.push({ mimeType: f.file_type, data, name: f.file_name });
+            } catch { /* skip unreadable file, don't block the question */ }
+          } else if (isTextType(f.file_type)) {
+            try {
+              const text = await fetchAttachmentText(url);
+              fileTextContext += `\n\nAttached file "${f.file_name}":\n"""\n${text.slice(0, MAX_TEXT_CHARS)}\n"""`;
+            } catch { /* skip */ }
+          }
+        }
+      }
+
+      const prompt = [
+        contextText ? `Regarding ${contextLabel}:\n"""\n${contextText.slice(0, MAX_TEXT_CHARS)}\n"""` : '',
+        fileTextContext,
+        `Question: ${question.trim()}`,
+      ].filter(Boolean).join('\n\n');
+
+      const message = { role: 'user' as const, content: prompt, ...(fileAttachments.length ? { attachments: fileAttachments } : {}) };
+      const res = await aiProvider.chat([message], context);
       setAnswer(res.message);
     } catch {
       setAnswer('Something went wrong. Please try again.');
@@ -48,6 +92,7 @@ export function AskAlora({ contextLabel, contextText, source }: Props) {
       <button onClick={() => setOpen(!open)} className="flex w-full items-center gap-2 px-4 py-3 text-left">
         <Sparkles size={14} className="shrink-0 text-[var(--accent-secondary)]" />
         <span className="flex-1 text-sm font-medium text-[var(--text-primary)]">Ask Alora about {contextLabel}</span>
+        {!!attachmentRefs?.length && <Paperclip size={12} className="text-[var(--text-secondary)]" />}
         {open ? <ChevronUp size={16} className="text-[var(--text-secondary)]" /> : <ChevronDown size={16} className="text-[var(--text-secondary)]" />}
       </button>
       {open && (

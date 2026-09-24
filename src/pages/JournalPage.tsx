@@ -172,7 +172,7 @@ export function JournalPage() {
                 <AttachmentList entityType="journal_entry" entityId={entry.id} />
               </div>
               <div className="mt-3">
-                <AskAlora contextLabel="this journal entry" source="journal" contextText={entry.content} />
+                <AskAlora contextLabel="this journal entry" source="journal" contextText={entry.content} attachmentRefs={[{ entityType: 'journal_entry', entityId: entry.id }]} />
               </div>
             </div>
           ))}

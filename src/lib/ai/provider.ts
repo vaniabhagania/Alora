@@ -19,6 +19,18 @@ import { RemoteAIProvider } from './remoteProvider';
  * intelligent, data-driven responses using the user's actual stored information.
  * When a real AI provider is connected, swap this out for the real implementation.
  */
+// AskAlora sends a compound prompt: grounding context (a journal entry, a
+// memory, a course summary...) followed by "\nQuestion: <what they typed>".
+// Keyword-matching against the whole thing means a word like "confused"
+// sitting inside someone else's quoted context — not the actual
+// question — can wrongly trigger the emotional-support branch. Scope
+// detection to the real question when this shape is present.
+function extractUserIntent(content: string): string {
+  const marker = '\nQuestion: ';
+  const idx = content.lastIndexOf(marker);
+  return idx === -1 ? content : content.slice(idx + marker.length);
+}
+
 class LocalAIProvider implements AIProvider {
   name = 'local';
 
@@ -30,9 +42,10 @@ class LocalAIProvider implements AIProvider {
       return { message: "I'm here. What's on your mind?", insights: [], suggestedActions: [] };
     }
 
-    const msg = lastUserMessage.content.toLowerCase();
+    const intentText = extractUserIntent(lastUserMessage.content);
+    const msg = intentText.toLowerCase();
 
-    if (detectEmotionalDistress(lastUserMessage.content)) {
+    if (detectEmotionalDistress(intentText)) {
       return {
         message: `I hear you, and what you're feeling right now is real. But I want to pause here — what you're describing goes beyond what I'm equipped to help with alone.\n\n${CRISIS_RESOURCES}\n\nI'm not going anywhere. When you're ready, we'll figure out the next step together.`,
         insights: [],
@@ -40,7 +53,7 @@ class LocalAIProvider implements AIProvider {
       };
     }
 
-    const emotions = detectEmotionalState(lastUserMessage.content);
+    const emotions = detectEmotionalState(intentText);
     if (emotions.length > 0) {
       return generateEmotionalResponse(emotions, context);
     }

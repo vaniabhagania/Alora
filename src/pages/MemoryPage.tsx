@@ -119,6 +119,7 @@ export function MemoryPage() {
             contextLabel="your memories"
             source="memory"
             contextText={filtered.slice(0, 30).map((m) => `[${CATEGORY_LABELS[m.category]}] ${m.content}`).join('\n')}
+            attachmentRefs={filtered.slice(0, 10).map((m) => ({ entityType: 'memory' as const, entityId: m.id }))}
           />
         </div>
       )}
