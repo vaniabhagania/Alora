@@ -13,11 +13,29 @@ export function SettingsPage() {
   const [phase, setPhase] = useState(profile?.current_phase || '');
   const [notifications, setNotifications] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [customInstructions, setCustomInstructions] = useState('');
+  const [savingInstructions, setSavingInstructions] = useState(false);
 
   useEffect(() => {
     setDisplayName(profile?.display_name || '');
     setPhase(profile?.current_phase || '');
   }, [profile]);
+
+  useEffect(() => {
+    if (!profile?.user_id) return;
+    supabase.from('settings').select('custom_chat_instructions').eq('user_id', profile.user_id).maybeSingle()
+      .then(({ data }) => setCustomInstructions(data?.custom_chat_instructions || ''));
+  }, [profile?.user_id]);
+
+  async function saveCustomInstructions() {
+    setSavingInstructions(true);
+    const { error } = await supabase
+      .from('settings')
+      .upsert({ user_id: profile?.user_id, custom_chat_instructions: customInstructions, updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
+    setSavingInstructions(false);
+    if (error) toast.show('Failed to save.', 'error');
+    else toast.show('Alora will use this from now on.');
+  }
 
   async function saveProfile() {
     setSaving(true);
@@ -59,7 +77,7 @@ export function SettingsPage() {
       </section>
 
       <section className="glass-card mb-4 p-5">
-        <div className="mb-4 flex items-center gap-3"><Globe size={18} className="text-[var(--accent-secondary)]" /><h2 className="font-display font-semibold text-[var(--text-primary)]">Your Worlds</h2></div>
+        <div className="mb-4 flex items-center gap-3"><Globe size={18} className="text-[var(--accent-secondary)]" /><h2 className="font-display font-semibold text-[var(--text-primary)]">Vibe</h2></div>
         <p className="mb-4 text-sm text-[var(--text-secondary)]">Your interface doesn't need a theme. It needs a feeling. Build the atmosphere you're living in.</p>
         {activeWorld ? (
           <div className="mb-4 flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.02] p-4">
@@ -76,7 +94,7 @@ export function SettingsPage() {
           <p className="mb-4 text-xs text-[var(--text-secondary)]">No active world. ALORA is using its default appearance.</p>
         )}
         <button onClick={() => window.dispatchEvent(new CustomEvent('alora-navigate', { detail: 'worlds' }))} className="flex items-center gap-2 rounded-xl border border-white/10 px-4 py-2 text-sm font-medium text-[var(--text-primary)] transition-colors hover:bg-white/5">
-          Open Your Worlds <ArrowRight size={16} />
+          Open Vibe <ArrowRight size={16} />
         </button>
       </section>
 
@@ -87,7 +105,24 @@ export function SettingsPage() {
 
       <section className="glass-card mb-4 p-5">
         <div className="mb-4 flex items-center gap-3"><Brain size={18} className="text-[var(--accent-secondary)]" /><h2 className="font-display font-semibold text-[var(--text-primary)]">AI & Privacy</h2></div>
-        <div className="space-y-3 text-sm text-[var(--text-secondary)]"><p>ALORA currently uses a local intelligence layer that works from your structured data. Connect an AI provider later through secure server-side functions — never expose keys in the browser.</p><p>Your raw memories and journal entries are never silently overwritten. AI-generated content is always kept separate and marked as a suggestion.</p></div>
+        <div className="space-y-3 text-sm text-[var(--text-secondary)]">
+          <p>Alora Chat is powered by Claude, called through a secure server-side function — the API key never reaches your browser. If that function isn't configured yet, Alora falls back to a local rule-based reply so chat still works.</p>
+          <p>Your raw memories and journal entries are never silently overwritten. AI-generated content is always kept separate and marked as a suggestion.</p>
+        </div>
+        <div className="mt-4 border-t border-white/5 pt-4">
+          <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Customize Alora</label>
+          <p className="mb-2 text-xs text-[var(--text-secondary)]">Tell Alora how to talk to you — tone, boundaries, what to focus on. Blended into every chat reply.</p>
+          <textarea
+            value={customInstructions}
+            onChange={(e) => setCustomInstructions(e.target.value)}
+            placeholder="e.g. Keep it short. Don't sugarcoat missed deadlines. Swear if it fits."
+            rows={3}
+            className="w-full resize-none rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50"
+          />
+          <button onClick={saveCustomInstructions} disabled={savingInstructions} className="btn-primary mt-3 px-4 py-2 text-sm">
+            {savingInstructions ? 'Saving...' : 'Save'}
+          </button>
+        </div>
       </section>
 
       <section className="glass-card mb-4 p-5">

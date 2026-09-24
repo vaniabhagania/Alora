@@ -107,4 +107,4 @@ export type EventType =
   | 'memory_created' | 'memory_updated' | 'memory_corrected'
   | 'world_created' | 'world_activated' | 'world_theme_changed'
   | 'identity_created' | 'identity_progress_updated'
-  | 'chat_message_sent' | 'chat_conversation_created';
+  | 'chat_message_sent' | 'chat_conversation_created' | 'distress_flagged';

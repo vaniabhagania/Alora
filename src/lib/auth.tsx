@@ -9,12 +9,28 @@ interface AuthContextValue {
   profile: AloraProfile | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
-  signUp: (email: string, password: string, displayName: string) => Promise<{ error: string | null }>;
+  signUp: (
+    email: string,
+    password: string,
+    displayName: string
+  ) => Promise<{ error: string | null; needsEmailConfirmation: boolean }>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
+
+/**
+ * Supabase surfaces an unreachable/misconfigured backend as a raw
+ * "Failed to fetch" network error rather than a real auth failure. Show
+ * something a user can act on instead of leaking fetch internals.
+ */
+function friendlyAuthError(error: { message: string }): string {
+  if (/failed to fetch/i.test(error.message)) {
+    return "Can't reach the server right now. Check your connection, or if you're the developer, verify the Supabase URL and key in .env.";
+  }
+  return error.message;
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
@@ -65,19 +81,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function signIn(email: string, password: string) {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
-    return { error: error?.message ?? null };
+    return { error: error ? friendlyAuthError(error) : null };
   }
 
   async function signUp(email: string, password: string, displayName: string) {
     const { data, error } = await supabase.auth.signUp({ email, password });
-    if (error) return { error: error.message };
+    if (error) return { error: friendlyAuthError(error), needsEmailConfirmation: false };
+
+    // If the project requires email confirmation, signUp succeeds with a
+    // user but no session — onAuthStateChange never fires, so the caller
+    // must handle this case explicitly instead of assuming auto-sign-in.
+    if (!data.session) {
+      return { error: null, needsEmailConfirmation: true };
+    }
+
     if (data.user) {
       await supabase.from('alora_profiles').insert({
         user_id: data.user.id,
         display_name: displayName,
       });
     }
-    return { error: null };
+    return { error: null, needsEmailConfirmation: false };
   }
 
   async function signOut() {

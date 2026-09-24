@@ -11,6 +11,7 @@ import type {
   ChatContext,
 } from './types';
 import { ALORA_SYSTEM_PROMPT, detectEmotionalDistress, detectEmotionalState, CRISIS_RESOURCES } from './types';
+import { ClaudeProvider } from './claudeProvider';
 
 /**
  * Local AI provider — generates contextual responses based on user data
@@ -370,6 +371,6 @@ function generateDefaultResponse(userMessage: string, context: ChatContext): AIC
   };
 }
 
-export const aiProvider: AIProvider = new LocalAIProvider();
+export const aiProvider: AIProvider = new ClaudeProvider(new LocalAIProvider());
 
 export { ALORA_SYSTEM_PROMPT };

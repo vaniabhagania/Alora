@@ -8,7 +8,7 @@ import { Modal, ConfirmModal } from '@/components/Modal';
 import { EmptyState, Skeleton } from '@/components/ui';
 import { Plus, CheckCircle2, Circle, Clock, AlertTriangle, Trash2, Calendar, Flag } from 'lucide-react';
 
-type View = 'today' | 'week' | 'upcoming' | 'overdue' | 'completed';
+type View = 'today' | 'week' | 'upcoming' | 'no_date' | 'overdue' | 'completed';
 
 export function TasksPage() {
   const { profile } = useAuth();
@@ -39,6 +39,7 @@ export function TasksPage() {
     if (view === 'today') return t.status !== 'completed' && t.deadline && new Date(t.deadline) <= todayEnd;
     if (view === 'week') return t.status !== 'completed' && t.deadline && new Date(t.deadline) > todayEnd && new Date(t.deadline) <= weekEnd;
     if (view === 'upcoming') return t.status !== 'completed' && t.deadline && new Date(t.deadline) > weekEnd;
+    if (view === 'no_date') return t.status !== 'completed' && !t.deadline;
     if (view === 'overdue') return t.status !== 'completed' && t.deadline && new Date(t.deadline) < now;
     if (view === 'completed') return t.status === 'completed';
     return true;
@@ -76,6 +77,7 @@ export function TasksPage() {
     { id: 'today', label: 'Today', count: tasks.filter((t) => t.status !== 'completed' && t.deadline && new Date(t.deadline) <= todayEnd).length },
     { id: 'week', label: 'This Week', count: tasks.filter((t) => t.status !== 'completed' && t.deadline && new Date(t.deadline) > todayEnd && new Date(t.deadline) <= weekEnd).length },
     { id: 'upcoming', label: 'Upcoming', count: tasks.filter((t) => t.status !== 'completed' && t.deadline && new Date(t.deadline) > weekEnd).length },
+    { id: 'no_date', label: 'No Date', count: tasks.filter((t) => t.status !== 'completed' && !t.deadline).length },
     { id: 'overdue', label: 'Overdue', count: tasks.filter((t) => t.status !== 'completed' && t.deadline && new Date(t.deadline) < now).length },
     { id: 'completed', label: 'Completed', count: tasks.filter((t) => t.status === 'completed').length },
   ];

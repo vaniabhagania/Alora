@@ -116,9 +116,9 @@ export function HomePage({ onNavigate }: HomeProps) {
       {/* Stats grid */}
       <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-4 animate-fade-in" style={{ animationDelay: '0.15s' }}>
         <StatCard icon={<Flame size={18} />} label="Streak" value={`${profile?.streak_days || 0} days`} />
-        <StatCard icon={<Brain size={18} />} label="Quiz Avg" value={`${avgQuizScore}%`} />
-        <StatCard icon={<AlertTriangle size={18} />} label="Overdue" value={`${overdueTasks.length}`} alert={overdueTasks.length > 0} />
-        <StatCard icon={<TrendingUp size={18} />} label="Goal Progress" value={`${overallProgress}%`} />
+        <StatCard icon={<Brain size={18} />} label="Quiz Avg" value={`${avgQuizScore}%`} onClick={() => onNavigate('quiz')} />
+        <StatCard icon={<AlertTriangle size={18} />} label="Overdue" value={`${overdueTasks.length}`} alert={overdueTasks.length > 0} onClick={() => onNavigate('tasks')} />
+        <StatCard icon={<TrendingUp size={18} />} label="Goal Progress" value={`${overallProgress}%`} onClick={() => onNavigate('future')} />
       </div>
 
       {loading ? (
@@ -131,7 +131,7 @@ export function HomePage({ onNavigate }: HomeProps) {
       ) : (
         <div className="grid gap-4 md:grid-cols-2">
           {/* Today's priorities */}
-          <div className="glass-card p-5 animate-fade-in" style={{ animationDelay: '0.2s' }}>
+          <button onClick={() => onNavigate('tasks')} className="glass-card p-5 text-left animate-fade-in" style={{ animationDelay: '0.2s' }}>
             <h3 className="mb-4 font-display font-semibold text-[var(--text-primary)]">Today's Priorities</h3>
             {todayTasks.length > 0 ? (
               <div className="space-y-2">
@@ -145,10 +145,10 @@ export function HomePage({ onNavigate }: HomeProps) {
             ) : (
               <p className="text-sm text-[var(--text-secondary)]">No tasks due today. Perfect time to get ahead.</p>
             )}
-          </div>
+          </button>
 
           {/* Upcoming deadlines */}
-          <div className="glass-card p-5 animate-fade-in" style={{ animationDelay: '0.25s' }}>
+          <button onClick={() => onNavigate('tasks')} className="glass-card p-5 text-left animate-fade-in" style={{ animationDelay: '0.25s' }}>
             <h3 className="mb-4 font-display font-semibold text-[var(--text-primary)]">Upcoming Deadlines</h3>
             {upcomingTasks.length > 0 ? (
               <div className="space-y-2">
@@ -165,7 +165,7 @@ export function HomePage({ onNavigate }: HomeProps) {
             ) : (
               <p className="text-sm text-[var(--text-secondary)]">Nothing due this week. You're ahead of the game.</p>
             )}
-          </div>
+          </button>
 
           {/* Quiz card */}
           <button onClick={() => onNavigate('quiz')} className="glass-card p-5 text-left animate-fade-in" style={{ animationDelay: '0.3s' }}>
@@ -187,7 +187,7 @@ export function HomePage({ onNavigate }: HomeProps) {
           </button>
 
           {/* Recent learning */}
-          <div className="glass-card p-5 animate-fade-in" style={{ animationDelay: '0.35s' }}>
+          <button onClick={() => onNavigate('academia')} className="glass-card p-5 text-left animate-fade-in" style={{ animationDelay: '0.35s' }}>
             <h3 className="mb-4 font-display font-semibold text-[var(--text-primary)]">Recent Learning</h3>
             {recentClasses.length > 0 ? (
               <div className="space-y-2">
@@ -214,10 +214,10 @@ export function HomePage({ onNavigate }: HomeProps) {
                 message="Log your first class in Academia to start building your learning history."
               />
             )}
-          </div>
+          </button>
 
           {/* Future self progress */}
-          <div className="glass-card p-5 animate-fade-in" style={{ animationDelay: '0.4s' }}>
+          <button onClick={() => onNavigate('future')} className="glass-card p-5 text-left animate-fade-in" style={{ animationDelay: '0.4s' }}>
             <h3 className="mb-4 font-display font-semibold text-[var(--text-primary)]">Future Self Progress</h3>
             {identities.length > 0 ? (
               <div className="space-y-3">
@@ -236,11 +236,11 @@ export function HomePage({ onNavigate }: HomeProps) {
             ) : (
               <p className="text-sm text-[var(--text-secondary)]">Define who you want to become in My Future.</p>
             )}
-          </div>
+          </button>
 
           {/* Overdue */}
           {overdueTasks.length > 0 && (
-            <div className="glass-card p-5 animate-fade-in" style={{ animationDelay: '0.45s', borderColor: 'rgba(244,63,94,0.2)' }}>
+            <button onClick={() => onNavigate('tasks')} className="glass-card p-5 text-left animate-fade-in" style={{ animationDelay: '0.45s', borderColor: 'rgba(244,63,94,0.2)' }}>
               <h3 className="mb-4 flex items-center gap-2 font-display font-semibold text-rose-400">
                 <AlertTriangle size={18} /> Overdue
               </h3>
@@ -254,7 +254,7 @@ export function HomePage({ onNavigate }: HomeProps) {
                   </div>
                 ))}
               </div>
-            </div>
+            </button>
           )}
         </div>
       )}
@@ -262,15 +262,16 @@ export function HomePage({ onNavigate }: HomeProps) {
   );
 }
 
-function StatCard({ icon, label, value, alert }: { icon: React.ReactNode; label: string; value: string; alert?: boolean }) {
+function StatCard({ icon, label, value, alert, onClick }: { icon: React.ReactNode; label: string; value: string; alert?: boolean; onClick?: () => void }) {
+  const Tag = onClick ? 'button' : 'div';
   return (
-    <div className="glass-card-flat p-4">
+    <Tag onClick={onClick} className={`glass-card-flat p-4 text-left ${onClick ? 'transition-transform hover:scale-[1.02]' : ''}`}>
       <div className="mb-2 flex items-center gap-2">
         <span className={alert ? 'text-rose-400' : 'text-[var(--accent-secondary)]'}>{icon}</span>
         <span className="text-xs uppercase tracking-wider text-[var(--text-secondary)]">{label}</span>
       </div>
       <p className="font-display text-xl font-bold text-[var(--text-primary)]">{value}</p>
-    </div>
+    </Tag>
   );
 }
 
