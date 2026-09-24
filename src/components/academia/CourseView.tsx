@@ -3,10 +3,14 @@ import { supabase } from '@/lib/supabase';
 import { useToast } from '@/lib/toast';
 import type { AcademicData } from '@/lib/academic';
 import type { Topic, TopicStatus } from '@/lib/types';
-import { EmptyState, ProgressBar } from '@/components/ui';
-import { CreateEntityModal, LogClassModal, type Level } from '@/components/academia/AcademiaHierarchy';
+import { EmptyState, ProgressBar, PopoverMenu } from '@/components/ui';
+import { ConfirmModal } from '@/components/Modal';
+import {
+  CreateEntityModal, EditEntityModal, DeleteConfirmModal, levelTable, countDeps,
+  type Level, type EditModalData, type DeleteTarget, LogClassModal,
+} from '@/components/academia/AcademiaHierarchy';
 import { AttachmentList } from '@/components/AttachmentList';
-import { ArrowLeft, BookOpen, FileText, Brain, Clock, AlertTriangle, TrendingUp, GraduationCap, CheckCircle2, Plus } from 'lucide-react';
+import { ArrowLeft, BookOpen, FileText, Brain, Clock, AlertTriangle, TrendingUp, GraduationCap, CheckCircle2, Plus, Pencil, Trash2 } from 'lucide-react';
 
 interface Props {
   courseId: string;
@@ -31,8 +35,12 @@ const STATUS_COLORS: Record<TopicStatus, string> = {
 export function CourseView({ courseId, data, onBack, reload }: Props) {
   const [tab, setTab] = useState<Tab>('overview');
   const [createModal, setCreateModal] = useState<{ level: Level; parentId?: string; parentLabel?: string } | null>(null);
+  const [editModal, setEditModal] = useState<EditModalData | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
+  const [deleteClassTarget, setDeleteClassTarget] = useState<string | null>(null);
   const [logClassModal, setLogClassModal] = useState(false);
   const [topicModuleId, setTopicModuleId] = useState('');
+  const toast = useToast();
 
   const course = data.courses.find((c) => c.id === courseId);
   if (!course) {
@@ -137,10 +145,16 @@ export function CourseView({ courseId, data, onBack, reload }: Props) {
             courseModules.map((mod) => {
               const modTopics = courseTopics.filter((t) => t.module_id === mod.id);
               return (
-                <div key={mod.id} className="glass-card p-4">
-                  <p className="text-sm font-medium text-[var(--text-primary)]">{mod.name}</p>
-                  {mod.description && <p className="mt-1 text-xs text-[var(--text-secondary)]">{mod.description}</p>}
-                  <p className="mt-2 text-xs text-[var(--text-secondary)]">{modTopics.length} topics</p>
+                <div key={mod.id} className="glass-card flex items-start justify-between p-4">
+                  <div>
+                    <p className="text-sm font-medium text-[var(--text-primary)]">{mod.name}</p>
+                    {mod.description && <p className="mt-1 text-xs text-[var(--text-secondary)]">{mod.description}</p>}
+                    <p className="mt-2 text-xs text-[var(--text-secondary)]">{modTopics.length} topics</p>
+                  </div>
+                  <PopoverMenu items={[
+                    { icon: <Pencil size={14} />, label: 'Edit', onClick: () => setEditModal({ level: 'module', id: mod.id, name: mod.name, description: mod.description || '' }) },
+                    { icon: <Trash2 size={14} />, label: 'Delete', onClick: () => setDeleteTarget({ id: mod.id, level: 'module', label: mod.name, deps: countDeps(data, 'module', mod.id) }), danger: true },
+                  ]} />
                 </div>
               );
             })
@@ -163,7 +177,15 @@ export function CourseView({ courseId, data, onBack, reload }: Props) {
             </div>
           )}
           {courseTopics.length === 0 ? <p className="text-sm text-[var(--text-secondary)]">No topics yet.</p> : (
-            courseTopics.map((topic) => <TopicRow key={topic.id} topic={topic} reload={reload} />)
+            courseTopics.map((topic) => (
+              <TopicRow
+                key={topic.id}
+                topic={topic}
+                reload={reload}
+                onEdit={() => setEditModal({ level: 'topic', id: topic.id, name: topic.name, description: topic.description || '', confidence: topic.confidence, status: topic.status })}
+                onDelete={() => setDeleteTarget({ id: topic.id, level: 'topic', label: topic.name, deps: countDeps(data, 'topic', topic.id) })}
+              />
+            ))
           )}
         </div>
       )}
@@ -176,7 +198,10 @@ export function CourseView({ courseId, data, onBack, reload }: Props) {
           {courseClasses.length === 0 ? <p className="text-sm text-[var(--text-secondary)]">No classes logged yet.</p> : (
             courseClasses.map((c) => { const log = data.classLogs.find((l) => l.class_id === c.id); const topic = data.topics.find((t) => t.id === c.topic_id); return (
               <div key={c.id} className="glass-card p-4">
-                <p className="text-sm font-medium text-[var(--text-primary)]">{c.title}</p>
+                <div className="flex items-start justify-between">
+                  <p className="text-sm font-medium text-[var(--text-primary)]">{c.title}</p>
+                  <button onClick={() => setDeleteClassTarget(c.id)} className="rounded-lg p-1.5 text-[var(--text-secondary)] hover:bg-rose-500/10 hover:text-rose-400"><Trash2 size={14} /></button>
+                </div>
                 <p className="text-xs text-[var(--text-secondary)]">{new Date(c.session_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}{topic ? ` · ${topic.name}` : ''}{log ? ` · Understanding: ${log.understanding_rating}/5` : ''}</p>
                 {log && log.raw_thoughts && <p className="mt-2 rounded-lg border border-ink/8 bg-ink/[0.02] px-3 py-2 text-xs text-[var(--text-secondary)]">{log.raw_thoughts}</p>}
                 <div className="mt-3">
@@ -248,11 +273,46 @@ export function CourseView({ courseId, data, onBack, reload }: Props) {
       {logClassModal && (
         <LogClassModal courses={data.courses} modules={data.modules} topics={data.topics} defaultCourseId={course.id} onClose={() => setLogClassModal(false)} onLogged={() => { setLogClassModal(false); reload(); }} />
       )}
+
+      {editModal && (
+        <EditEntityModal data={editModal} allData={data} onClose={() => setEditModal(null)} onSaved={() => { setEditModal(null); reload(); }} />
+      )}
+
+      {deleteTarget && (
+        <DeleteConfirmModal
+          target={deleteTarget}
+          onClose={() => setDeleteTarget(null)}
+          onConfirm={async () => {
+            const { error } = await supabase.from(levelTable(deleteTarget.level)).delete().eq('id', deleteTarget.id);
+            if (error) toast.show('Failed to delete.', 'error'); else { toast.show('Deleted permanently.'); reload(); }
+            setDeleteTarget(null);
+          }}
+          onArchive={async () => {
+            const { error } = await supabase.from(levelTable(deleteTarget.level)).update({ archived: true }).eq('id', deleteTarget.id);
+            if (error) toast.show('Failed to archive.', 'error'); else { toast.show('Archived.'); reload(); }
+            setDeleteTarget(null);
+          }}
+        />
+      )}
+
+      <ConfirmModal
+        open={!!deleteClassTarget}
+        onClose={() => setDeleteClassTarget(null)}
+        onConfirm={async () => {
+          const { error } = await supabase.from('classes').delete().eq('id', deleteClassTarget);
+          if (error) toast.show('Failed to delete.', 'error'); else { toast.show('Class deleted.'); reload(); }
+          setDeleteClassTarget(null);
+        }}
+        title="Delete Class"
+        message="This removes the logged class and its notes permanently. This cannot be undone."
+        confirmLabel="Delete"
+        danger
+      />
     </div>
   );
 }
 
-function TopicRow({ topic, reload }: { topic: Topic; reload: () => Promise<void> }) {
+function TopicRow({ topic, reload, onEdit, onDelete }: { topic: Topic; reload: () => Promise<void>; onEdit: () => void; onDelete: () => void }) {
   const toast = useToast();
   const [editing, setEditing] = useState(false);
   const [status, setStatus] = useState<TopicStatus>(topic.status);
@@ -281,7 +341,13 @@ function TopicRow({ topic, reload }: { topic: Topic; reload: () => Promise<void>
             {topic.review_count > 0 ? ` · reviewed ${topic.review_count}x` : ''}
           </p>
         </div>
-        <button onClick={() => setEditing(!editing)} className="text-xs text-[var(--accent-secondary)] hover:underline">{editing ? 'Cancel' : 'Edit'}</button>
+        <div className="flex items-center gap-1">
+          <button onClick={() => setEditing(!editing)} className="text-xs text-[var(--accent-secondary)] hover:underline">{editing ? 'Cancel' : 'Update Progress'}</button>
+          <PopoverMenu items={[
+            { icon: <Pencil size={14} />, label: 'Rename / Edit', onClick: onEdit },
+            { icon: <Trash2 size={14} />, label: 'Delete', onClick: onDelete, danger: true },
+          ]} />
+        </div>
       </div>
       {editing && (
         <div className="mt-3 space-y-3 border-t border-ink/8 pt-3">
