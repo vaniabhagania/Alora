@@ -14,7 +14,7 @@ interface WorldsPageProps {
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function WorldsPage({ onNavigate }: WorldsPageProps) {
-  const { worlds, loading, createWorld, deleteWorld, duplicateWorld, activateWorld, updateWorld, refresh } = useWorlds();
+  const { worlds, activeWorld, loading, createWorld, deleteWorld, duplicateWorld, activateWorld, deactivateWorld, updateWorld, refresh } = useWorlds();
   const toast = useToast();
   const [createModal, setCreateModal] = useState(false);
   const [editModal, setEditModal] = useState<World | null>(null);
@@ -49,6 +49,11 @@ export function WorldsPage({ onNavigate }: WorldsPageProps) {
     toast.show(`${world.name} is now your active world.`);
   }
 
+  function handleDeactivate() {
+    deactivateWorld();
+    toast.show('Vibe disabled. Back to default appearance.');
+  }
+
   async function handleDuplicate(world: World) {
     const id = await duplicateWorld(world.id);
     if (id) toast.show('World duplicated.');
@@ -69,6 +74,17 @@ export function WorldsPage({ onNavigate }: WorldsPageProps) {
         <p className="text-sm text-[var(--text-secondary)]">Build the atmosphere you're living in.</p>
         <p className="mt-1 text-xs text-[var(--text-secondary)]/70">Your interface doesn't need a theme. It needs a feeling.</p>
       </div>
+
+      {activeWorld && (
+        <div className="mx-auto mb-6 flex max-w-md items-center justify-between gap-3 rounded-xl border border-ink/10 bg-ink/[0.03] px-4 py-3">
+          <p className="text-sm text-[var(--text-secondary)]">
+            <span className="font-medium text-[var(--text-primary)]">{activeWorld.name}</span> is active
+          </p>
+          <button onClick={handleDeactivate} className="shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium text-[var(--text-secondary)] hover:bg-ink/5 hover:text-[var(--text-primary)]">
+            Disable Vibe
+          </button>
+        </div>
+      )}
 
       <div className="mb-8 flex justify-center">
         <button

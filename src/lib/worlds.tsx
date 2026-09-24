@@ -15,6 +15,7 @@ interface WorldContextValue {
   deleteWorld: (id: string) => Promise<void>;
   duplicateWorld: (id: string) => Promise<string | null>;
   activateWorld: (id: string) => Promise<void>;
+  deactivateWorld: () => Promise<void>;
   updateWorldTheme: (id: string, themeSettings: WorldThemeSettings) => Promise<void>;
 }
 
@@ -128,9 +129,18 @@ export function WorldProvider({ children }: { children: ReactNode }) {
 
   const activateWorld = useCallback(async (id: string) => {
     if (!user) return;
-    // Deactivate all, then activate the selected one
-    await supabase.from('worlds').update({ is_active: false }).neq('id', '___none___');
+    // Deactivate all, then activate the selected one. '___none___' isn't a
+    // valid uuid, so .neq('id', ...) against it 400'd and silently did
+    // nothing — .not('id', 'is', null) matches every row regardless of
+    // column type.
+    await supabase.from('worlds').update({ is_active: false }).not('id', 'is', null);
     await supabase.from('worlds').update({ is_active: true }).eq('id', id);
+    await refresh();
+  }, [user, refresh]);
+
+  const deactivateWorld = useCallback(async () => {
+    if (!user) return;
+    await supabase.from('worlds').update({ is_active: false }).not('id', 'is', null);
     await refresh();
   }, [user, refresh]);
 
@@ -159,6 +169,7 @@ export function WorldProvider({ children }: { children: ReactNode }) {
       deleteWorld,
       duplicateWorld,
       activateWorld,
+      deactivateWorld,
       updateWorldTheme,
     }}>
       {children}
