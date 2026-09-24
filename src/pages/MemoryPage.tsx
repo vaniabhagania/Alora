@@ -7,6 +7,7 @@ import type { Memory, MemoryCategory } from '@/lib/types';
 import { Modal, ConfirmModal } from '@/components/Modal';
 import { EmptyState, Skeleton } from '@/components/ui';
 import { AttachmentList } from '@/components/AttachmentList';
+import { AskAlora } from '@/components/AskAlora';
 import { Plus, Database, Trash2, Search, Tag, Pencil } from 'lucide-react';
 
 const CATEGORIES: MemoryCategory[] = [
@@ -111,6 +112,16 @@ export function MemoryPage() {
           </button>
         ))}
       </div>
+
+      {memories.length > 0 && (
+        <div className="mb-6">
+          <AskAlora
+            contextLabel="your memories"
+            source="memory"
+            contextText={filtered.slice(0, 30).map((m) => `[${CATEGORY_LABELS[m.category]}] ${m.content}`).join('\n')}
+          />
+        </div>
+      )}
 
       {loading ? (
         <div className="space-y-3"><Skeleton className="h-20" /><Skeleton className="h-20" /><Skeleton className="h-20" /></div>

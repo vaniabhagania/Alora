@@ -6,6 +6,7 @@ import type { Task } from '@/lib/types';
 import { cascadeTaskCompletion, cascadeTaskCreation } from '@/lib/brain/cascade';
 import { Modal, ConfirmModal } from '@/components/Modal';
 import { EmptyState, Skeleton } from '@/components/ui';
+import { AskAlora } from '@/components/AskAlora';
 import { Plus, CheckCircle2, Circle, Clock, Trash2, Flag, Pencil } from 'lucide-react';
 
 type View = 'today' | 'week' | 'upcoming' | 'no_date' | 'overdue' | 'completed';
@@ -113,6 +114,16 @@ export function TasksPage() {
           </button>
         ))}
       </div>
+
+      {tasks.length > 0 && (
+        <div className="mb-6">
+          <AskAlora
+            contextLabel={`your ${views.find((v) => v.id === view)?.label.toLowerCase() || ''} tasks`}
+            source="tasks"
+            contextText={filtered.map((t) => `${t.title} (${t.priority}, ${t.category}${t.deadline ? `, due ${new Date(t.deadline).toLocaleDateString()}` : ''})${t.description ? `: ${t.description}` : ''}`).join('\n')}
+          />
+        </div>
+      )}
 
       {loading ? (
         <div className="space-y-3">

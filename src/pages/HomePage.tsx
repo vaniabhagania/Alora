@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth';
 import type { Task, ClassSession, Course, QuizAttempt, Goal, Identity } from '@/lib/types';
 import { ProgressRing, EmptyState, Skeleton } from '@/components/ui';
+import { AskAlora } from '@/components/AskAlora';
 import { MessageSquare, Calendar, AlertTriangle, Brain, Flame, TrendingUp, Sparkles, ArrowRight, Clock } from 'lucide-react';
 
 interface HomeProps {
@@ -101,6 +102,19 @@ export function HomePage({ onNavigate }: HomeProps) {
         </div>
         <ArrowRight size={20} className="text-[var(--text-secondary)]" />
       </button>
+
+      <div className="mb-6 animate-fade-in" style={{ animationDelay: '0.07s' }}>
+        <AskAlora
+          contextLabel="your dashboard"
+          source="home"
+          contextText={[
+            overdueTasks.length ? `Overdue tasks: ${overdueTasks.map((t) => t.title).join(', ')}` : '',
+            upcomingTasks.length ? `Upcoming tasks: ${upcomingTasks.map((t) => t.title).join(', ')}` : '',
+            goals.length ? `Goals: ${goals.map((g) => `${g.title} (${g.progress}%)`).join(', ')}` : '',
+            `Quiz average: ${avgQuizScore}%`,
+          ].filter(Boolean).join('\n')}
+        />
+      </div>
 
       {/* ALORA Insight */}
       {insight && (

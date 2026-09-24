@@ -34,6 +34,7 @@ interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
   content: string;
   timestamp?: string;
+  image?: { mimeType: string; data: string };
 }
 
 interface ChatContext {
@@ -193,7 +194,13 @@ Deno.serve(async (req: Request) => {
     // leading assistant turns before sending.
     const geminiContents = messages
       .filter((m) => m.role === 'user' || m.role === 'assistant')
-      .map((m) => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] }));
+      .map((m) => {
+        const parts: Record<string, unknown>[] = [{ text: m.content }];
+        if (m.image) {
+          parts.push({ inlineData: { mimeType: m.image.mimeType, data: m.image.data } });
+        }
+        return { role: m.role === 'assistant' ? 'model' : 'user', parts };
+      });
     while (geminiContents.length && geminiContents[0].role === 'model') {
       geminiContents.shift();
     }

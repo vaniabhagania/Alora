@@ -2,10 +2,25 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { useAuth } from '@/lib/auth';
 import { useSettings } from '@/lib/settingsContext';
 import { aiProvider } from '@/lib/ai/provider';
-import type { ChatMessage, ChatContext } from '@/lib/ai/types';
-import { getStudentContext } from '@/lib/brain';
+import type { ChatMessage } from '@/lib/ai/types';
+import { buildChatContext } from '@/lib/ai/buildContext';
 import { detectNavIntent, type NavIntent } from '@/lib/nav';
-import { Send, Sparkles, LayoutGrid, X } from 'lucide-react';
+import { useToast } from '@/lib/toast';
+import { Send, Sparkles, LayoutGrid, X, ImagePlus } from 'lucide-react';
+
+const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
+
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      resolve(result.slice(result.indexOf(',') + 1));
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
 
 export function ChatPage() {
   const { profile } = useAuth();
@@ -14,36 +29,15 @@ export function ChatPage() {
   const [input, setInput] = useState('');
   const [thinking, setThinking] = useState(false);
   const [navSuggestion, setNavSuggestion] = useState<NavIntent | null>(null);
+  const [attachedImage, setAttachedImage] = useState<{ previewUrl: string; mimeType: string; base64: string } | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const toast = useToast();
 
   // Sourced from the unified brain (src/lib/brain) rather than ad hoc
   // queries, so chat sees exactly the same picture of the user as every
   // other feature — one brain, one memory.
-  const loadContext = useCallback(async (): Promise<ChatContext> => {
-    if (!profile) {
-      return { userName: '', recentClasses: [], upcomingTasks: [], overdueTasks: [], weakTopics: [], strongTopics: [], goals: [], identities: [], streak: 0, quizAvgScore: 0 };
-    }
-
-    const ctx = await getStudentContext('chat');
-    const courseNameById = new Map(ctx.courses.map((c) => [c.id, c.name]));
-
-    return {
-      userName: profile.display_name || 'there',
-      recentClasses: ctx.recentClasses.slice(0, 10).map((c) => ({
-        course: courseNameById.get(c.course_id) || 'Unknown',
-        title: c.title,
-        date: c.session_date,
-      })),
-      upcomingTasks: ctx.upcomingTasks.slice(0, 5).map((t) => ({ title: t.title, deadline: t.deadline!, priority: t.priority })),
-      overdueTasks: ctx.overdueTasks.map((t) => ({ title: t.title, deadline: t.deadline! })),
-      weakTopics: ctx.weakTopics.map((w) => w.name),
-      strongTopics: ctx.strongTopics,
-      goals: ctx.activeGoals.map((g) => ({ title: g.title, progress: g.progress })),
-      identities: ctx.identities.map((i) => ({ name: i.name, progress: i.progress })),
-      streak: ctx.streak,
-      quizAvgScore: ctx.quizAverage,
-    };
-  }, [profile]);
+  const loadContext = useCallback(() => buildChatContext(profile, 'chat'), [profile]);
 
   useEffect(() => {
     if (messages.length === 0) {
@@ -61,11 +55,27 @@ export function ChatPage() {
     }
   }, [messages, thinking]);
 
+  async function handleImageSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    if (!file.type.startsWith('image/')) { toast.show('Please choose an image file.', 'error'); return; }
+    if (file.size > MAX_IMAGE_BYTES) { toast.show('Image is too large (max 4MB).', 'error'); return; }
+    const base64 = await fileToBase64(file);
+    setAttachedImage({ previewUrl: URL.createObjectURL(file), mimeType: file.type, base64 });
+  }
+
   async function handleSend() {
-    if (!input.trim() || thinking) return;
-    const userMsg: ChatMessage = { role: 'user', content: input.trim(), timestamp: new Date().toISOString() };
+    if ((!input.trim() && !attachedImage) || thinking) return;
+    const userMsg: ChatMessage = {
+      role: 'user',
+      content: input.trim(),
+      timestamp: new Date().toISOString(),
+      ...(attachedImage ? { image: { mimeType: attachedImage.mimeType, data: attachedImage.base64 } } : {}),
+    };
     setMessages((prev) => [...prev, userMsg]);
     setInput('');
+    setAttachedImage(null);
     setThinking(true);
 
     const intent = detectNavIntent(userMsg.content);
@@ -138,7 +148,10 @@ export function ChatPage() {
                     <span className="text-[10px] font-medium uppercase tracking-wider text-[var(--accent-secondary)]">ALORA</span>
                   </div>
                 )}
-                <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
+                {msg.image && (
+                  <img src={`data:${msg.image.mimeType};base64,${msg.image.data}`} alt="Attached" className="mb-2 max-h-60 rounded-xl border border-ink/10" />
+                )}
+                {msg.content && <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>}
               </div>
             </div>
           ))}
@@ -188,7 +201,22 @@ export function ChatPage() {
       )}
 
       <div className="border-t border-ink/8 px-4 py-4 md:px-8">
+        {attachedImage && (
+          <div className="mx-auto mb-2 flex max-w-3xl items-center gap-2">
+            <div className="relative">
+              <img src={attachedImage.previewUrl} alt="Attached" className="h-14 w-14 rounded-lg border border-ink/10 object-cover" />
+              <button onClick={() => setAttachedImage(null)} className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-rose-500 text-white">
+                <X size={12} />
+              </button>
+            </div>
+            <p className="text-xs text-[var(--text-secondary)]">Image attached — Alora can see this.</p>
+          </div>
+        )}
         <div className="mx-auto flex max-w-3xl items-end gap-2">
+          <button onClick={() => fileInputRef.current?.click()} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-ink/10 text-[var(--text-secondary)] hover:bg-ink/5 hover:text-[var(--text-primary)]">
+            <ImagePlus size={18} />
+          </button>
+          <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageSelect} />
           <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
@@ -198,7 +226,7 @@ export function ChatPage() {
             className="flex-1 resize-none rounded-xl border border-ink/10 bg-ink/[0.03] px-4 py-3 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50"
             style={{ maxHeight: '120px' }}
           />
-          <button onClick={handleSend} disabled={!input.trim() || thinking} className="btn-primary flex h-11 w-11 shrink-0 items-center justify-center">
+          <button onClick={handleSend} disabled={(!input.trim() && !attachedImage) || thinking} className="btn-primary flex h-11 w-11 shrink-0 items-center justify-center">
             <Send size={18} />
           </button>
         </div>
