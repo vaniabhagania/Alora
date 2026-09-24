@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/lib/toast';
+import { aiProvider } from '@/lib/ai/provider';
 import type { AcademicData } from '@/lib/academic';
-import type { AcademicYear, Semester, Course, Module, Topic, ClassSession, ClassLog } from '@/lib/types';
-import { Modal, ConfirmModal } from '@/components/Modal';
+import type { Course, Module, Topic, ClassSession } from '@/lib/types';
+import { Modal } from '@/components/Modal';
 import { EmptyState, PopoverMenu } from '@/components/ui';
 import {
   ChevronRight, ChevronDown, Plus, GraduationCap, FileText, Trash2,
-  Pencil, Archive, ArchiveRestore, ArrowUp, ArrowDown,
+  Pencil, Archive, ArchiveRestore, ArrowUp, ArrowDown, Sparkles, CheckSquare,
 } from 'lucide-react';
 
 type Level = 'year' | 'semester' | 'course' | 'module' | 'topic';
@@ -673,8 +674,48 @@ function LogClassModal({ courses, modules, topics, defaultCourseId, onClose, onL
   const [confusions, setConfusions] = useState('');
   const [learnings, setLearnings] = useState('');
   const [saving, setSaving] = useState(false);
+  const [summarizing, setSummarizing] = useState(false);
+  const [suggestedTasks, setSuggestedTasks] = useState<{ title: string; deadline: string; priority: string; category: string }[]>([]);
+  const [addingTasks, setAddingTasks] = useState(false);
 
   const courseTopics = topics.filter((t) => { const mod = modules.find((m) => m.id === t.module_id); return mod?.course_id === selectedCourse; });
+
+  async function handleSummarize() {
+    if (!rawThoughts.trim()) { toast.show('Write your raw thoughts first.', 'error'); return; }
+    setSummarizing(true);
+    try {
+      const [summary, extraction] = await Promise.all([
+        aiProvider.summarizeClass(rawThoughts),
+        aiProvider.extractTasks(rawThoughts),
+      ]);
+      if (summary.understanding === 'low') setUnderstanding(2);
+      else if (summary.understanding === 'high') setUnderstanding(4);
+      else setUnderstanding(3);
+      if (summary.questions.length) setQuestions((prev) => [prev, ...summary.questions].filter(Boolean).join('\n'));
+      if (summary.weakAreas.length) setConfusions((prev) => [prev, ...summary.weakAreas].filter(Boolean).join('\n'));
+      if (summary.learnings.length) setLearnings((prev) => [prev, ...summary.learnings].filter(Boolean).join('\n'));
+      setSuggestedTasks(extraction.tasks);
+      toast.show(extraction.tasks.length > 0 ? `Summarized — found ${extraction.tasks.length} possible task(s).` : 'Summarized.');
+    } catch {
+      toast.show('Could not summarize right now.', 'error');
+    }
+    setSummarizing(false);
+  }
+
+  async function handleAddSuggestedTasks() {
+    if (suggestedTasks.length === 0) return;
+    setAddingTasks(true);
+    const { error } = await supabase.from('tasks').insert(suggestedTasks.map((t) => ({
+      title: t.title,
+      deadline: t.deadline ? new Date(t.deadline).toISOString() : null,
+      priority: t.priority || 'medium',
+      category: t.category || 'academic',
+      related_course_id: selectedCourse || null,
+    })));
+    setAddingTasks(false);
+    if (error) toast.show('Failed to add tasks.', 'error');
+    else { toast.show(`${suggestedTasks.length} task(s) added.`); setSuggestedTasks([]); }
+  }
 
   async function handleLog() {
     if (!selectedCourse) { toast.show('Please select a course.', 'error'); return; }
@@ -714,7 +755,32 @@ function LogClassModal({ courses, modules, topics, defaultCourseId, onClose, onL
           </div>
         )}
         <div><label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Title (optional)</label><input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Lecture on Hypothesis Testing" className="w-full rounded-xl border border-black/10 bg-black/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50" /></div>
-        <div><label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Your raw thoughts</label><textarea value={rawThoughts} onChange={(e) => setRawThoughts(e.target.value)} placeholder="Just talk naturally. What happened? What did you learn? What confused you?" rows={5} className="w-full rounded-xl border border-black/10 bg-black/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50" /><p className="mt-1 text-xs text-[var(--text-secondary)]/60">Your original words are preserved forever.</p></div>
+        <div>
+          <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Your raw thoughts</label>
+          <textarea value={rawThoughts} onChange={(e) => setRawThoughts(e.target.value)} placeholder="Just talk naturally. What happened? What did you learn? What confused you?" rows={5} className="w-full rounded-xl border border-black/10 bg-black/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50" />
+          <div className="mt-1.5 flex items-center justify-between">
+            <p className="text-xs text-[var(--text-secondary)]/60">Your original words are preserved forever.</p>
+            <button type="button" onClick={handleSummarize} disabled={summarizing || !rawThoughts.trim()} className="flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium text-[var(--accent-secondary)] hover:bg-[var(--accent)]/10 disabled:opacity-40">
+              <Sparkles size={12} /> {summarizing ? 'Summarizing...' : 'Summarize with AI'}
+            </button>
+          </div>
+        </div>
+        {suggestedTasks.length > 0 && (
+          <div className="rounded-xl border border-[var(--accent)]/15 bg-[var(--accent)]/5 p-3">
+            <p className="mb-2 flex items-center gap-1.5 text-xs font-medium text-[var(--accent-secondary)]"><CheckSquare size={12} /> AI found {suggestedTasks.length} possible task(s) — review before adding</p>
+            <ul className="mb-2 space-y-1">
+              {suggestedTasks.map((t, i) => (
+                <li key={i} className="text-xs text-[var(--text-primary)]">• {t.title}{t.deadline ? ` — ${t.deadline}` : ''}</li>
+              ))}
+            </ul>
+            <div className="flex gap-2">
+              <button type="button" onClick={handleAddSuggestedTasks} disabled={addingTasks} className="rounded-lg bg-[var(--accent)]/15 px-2.5 py-1 text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--accent)]/25">
+                {addingTasks ? 'Adding...' : `Add ${suggestedTasks.length} task(s)`}
+              </button>
+              <button type="button" onClick={() => setSuggestedTasks([])} className="rounded-lg px-2.5 py-1 text-xs font-medium text-[var(--text-secondary)] hover:bg-black/5">Dismiss</button>
+            </div>
+          </div>
+        )}
         <div className="grid grid-cols-2 gap-4">
           <div><label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Understanding: {understanding}/5</label><input type="range" min={1} max={5} value={understanding} onChange={(e) => setUnderstanding(Number(e.target.value))} className="w-full accent-[var(--accent)]" /></div>
           <div><label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Usefulness: {usefulness}/5</label><input type="range" min={1} max={5} value={usefulness} onChange={(e) => setUsefulness(Number(e.target.value))} className="w-full accent-[var(--accent)]" /></div>

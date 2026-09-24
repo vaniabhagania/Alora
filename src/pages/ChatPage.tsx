@@ -1,11 +1,9 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useAuth } from '@/lib/auth';
-import { useToast } from '@/lib/toast';
 import { aiProvider } from '@/lib/ai/provider';
 import type { ChatMessage, ChatContext } from '@/lib/ai/types';
 import { getStudentContext } from '@/lib/brain';
-import { EmptyState, LoadingSpinner } from '@/components/ui';
-import { Send, Sparkles, Brain } from 'lucide-react';
+import { Send, Sparkles } from 'lucide-react';
 
 export function ChatPage() {
   const { profile } = useAuth();

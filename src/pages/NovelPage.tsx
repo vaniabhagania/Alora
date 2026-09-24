@@ -2,7 +2,9 @@ import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth';
 import { useToast } from '@/lib/toast';
+import { aiProvider } from '@/lib/ai/provider';
 import type { NovelProject, NovelChapter, NovelScene, JournalEntry } from '@/lib/types';
+import type { AINovelCuration } from '@/lib/ai/types';
 import { Modal, ConfirmModal } from '@/components/Modal';
 import { EmptyState, Skeleton } from '@/components/ui';
 import { Plus, BookA, Trash2, ChevronRight, ChevronDown, BookMarked, Sparkles, FileText } from 'lucide-react';
@@ -152,6 +154,13 @@ export function NovelPage() {
                                         <div className="mt-2 rounded-lg border border-[var(--accent)]/10 bg-[var(--accent)]/5 px-3 py-2">
                                           <p className="mb-1 flex items-center gap-1 text-[10px] uppercase tracking-wider text-[var(--accent-secondary)]"><Sparkles size={10} /> Curated Story</p>
                                           <p className="text-xs text-[var(--text-primary)]">{scene.curated_content}</p>
+                                          {scene.ai_suggestions.length > 0 && (
+                                            <ul className="mt-1.5 space-y-0.5 border-t border-[var(--accent)]/10 pt-1.5">
+                                              {(scene.ai_suggestions as { type: string; content: string }[]).map((s, i) => (
+                                                <li key={i} className="text-[11px] text-[var(--text-secondary)]"><span className="capitalize text-[var(--accent-secondary)]">{s.type}:</span> {s.content}</li>
+                                              ))}
+                                            </ul>
+                                          )}
                                         </div>
                                       )}
                                     </div>
@@ -278,12 +287,27 @@ function CreateSceneModal({ chapters, journalEntries, onClose, onCreated }: { ch
   const [rawContent, setRawContent] = useState('');
   const [sourceMemoryId, setSourceMemoryId] = useState('');
   const [saving, setSaving] = useState(false);
+  const [curating, setCurating] = useState(false);
+  const [curation, setCuration] = useState<AINovelCuration | null>(null);
+
+  async function handleCurate() {
+    if (!rawContent.trim()) { toast.show('Write the scene first.', 'error'); return; }
+    setCurating(true);
+    try {
+      setCuration(await aiProvider.curateNovelScene(rawContent));
+    } catch {
+      toast.show('Could not curate right now.', 'error');
+    }
+    setCurating(false);
+  }
 
   async function handleCreate() {
     if (!title.trim() || !chapterId) { toast.show('Please enter a title and select a chapter.', 'error'); return; }
     setSaving(true);
     const { error } = await supabase.from('novel_scenes').insert({
       title, chapter_id: chapterId, raw_content: rawContent,
+      curated_content: curation?.curatedContent || '',
+      ai_suggestions: curation?.aiSuggestions || [],
       source_memory_id: sourceMemoryId || null, position: 1,
     });
     setSaving(false);
@@ -315,9 +339,27 @@ function CreateSceneModal({ chapters, journalEntries, onClose, onCreated }: { ch
         )}
         <div>
           <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Raw Content</label>
-          <textarea value={rawContent} onChange={(e) => setRawContent(e.target.value)} placeholder="Write the scene in your own words..." rows={5} className="w-full rounded-xl border border-black/10 bg-black/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50" />
-          <p className="mt-1 text-xs text-[var(--text-secondary)]/60">Raw content is preserved. AI curation will be added as a separate layer, clearly marked.</p>
+          <textarea value={rawContent} onChange={(e) => { setRawContent(e.target.value); setCuration(null); }} placeholder="Write the scene in your own words..." rows={5} className="w-full rounded-xl border border-black/10 bg-black/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50" />
+          <div className="mt-1.5 flex items-center justify-between">
+            <p className="text-xs text-[var(--text-secondary)]/60">Raw content is preserved. AI curation is added as a separate layer, clearly marked.</p>
+            <button type="button" onClick={handleCurate} disabled={curating || !rawContent.trim()} className="flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium text-[var(--accent-secondary)] hover:bg-[var(--accent)]/10 disabled:opacity-40">
+              <Sparkles size={12} /> {curating ? 'Curating...' : 'Curate with AI'}
+            </button>
+          </div>
         </div>
+        {curation && (
+          <div className="rounded-xl border border-[var(--accent)]/15 bg-[var(--accent)]/5 p-3">
+            <p className="mb-1 flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-[var(--accent-secondary)]"><Sparkles size={10} /> Curated Story</p>
+            <p className="mb-2 text-sm text-[var(--text-primary)]">{curation.curatedContent}</p>
+            {curation.aiSuggestions.length > 0 && (
+              <ul className="space-y-1 border-t border-[var(--accent)]/10 pt-2">
+                {curation.aiSuggestions.map((s, i) => (
+                  <li key={i} className="text-xs text-[var(--text-secondary)]"><span className="capitalize text-[var(--accent-secondary)]">{s.type}:</span> {s.content}</li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
         <div className="flex justify-end gap-3">
           <button onClick={onClose} className="rounded-xl px-4 py-2 text-sm font-medium text-[var(--text-secondary)] hover:bg-black/5">Cancel</button>
           <button onClick={handleCreate} disabled={saving} className="btn-primary px-5 py-2 text-sm">{saving ? 'Creating...' : 'Create'}</button>

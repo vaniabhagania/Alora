@@ -2,10 +2,13 @@ import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth';
 import { useToast } from '@/lib/toast';
+import { aiProvider } from '@/lib/ai/provider';
+import { trackEvent } from '@/lib/brain/events';
 import type { JournalEntry } from '@/lib/types';
+import type { AIReflection } from '@/lib/ai/types';
 import { Modal, ConfirmModal } from '@/components/Modal';
 import { EmptyState, Skeleton } from '@/components/ui';
-import { Plus, BookOpen, Trash2, BookMarked, Smile, Calendar } from 'lucide-react';
+import { Plus, BookOpen, Trash2, BookMarked, Smile, Calendar, Sparkles } from 'lucide-react';
 
 const MOODS = ['great', 'good', 'okay', 'low', 'rough'];
 const CATEGORIES = ['reflection', 'idea', 'experience', 'lesson', 'growth', 'academic', 'personal'];
@@ -17,6 +20,8 @@ export function JournalPage() {
   const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [createModal, setCreateModal] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const [reflecting, setReflecting] = useState(false);
+  const [reflection, setReflection] = useState<AIReflection | null>(null);
 
   const loadEntries = useCallback(async () => {
     if (!profile) return;
@@ -38,6 +43,24 @@ export function JournalPage() {
     setDeleteTarget(null);
   }
 
+  async function handleReflect() {
+    setReflecting(true);
+    try {
+      const result = await aiProvider.reflect(entries.slice(0, 15).map((e) => e.content));
+      setReflection(result);
+      await supabase.from('insights').insert({
+        insight_type: 'journal_reflection',
+        title: 'Journal reflection',
+        description: result.insights.join(' '),
+        evidence: result.patterns,
+      });
+      await trackEvent('journal_saved_to_memory', 'journal', null, { insightCount: result.insights.length });
+    } catch {
+      toast.show('Could not reflect right now.', 'error');
+    }
+    setReflecting(false);
+  }
+
   const moodColors: Record<string, string> = {
     great: 'text-emerald-400', good: 'text-sky-400', okay: 'text-[var(--text-secondary)]', low: 'text-orange-400', rough: 'text-rose-400',
   };
@@ -49,10 +72,44 @@ export function JournalPage() {
           <h1 className="font-display text-2xl font-bold text-[var(--text-primary)]">Journal</h1>
           <p className="mt-1 text-sm text-[var(--text-secondary)]">Your personal life log. Every entry is preserved forever.</p>
         </div>
-        <button onClick={() => setCreateModal(true)} className="btn-primary flex items-center gap-2 px-4 py-2 text-sm">
-          <Plus size={16} /> New Entry
-        </button>
+        <div className="flex items-center gap-2">
+          {entries.length >= 3 && (
+            <button onClick={handleReflect} disabled={reflecting} className="flex items-center gap-2 rounded-xl border border-black/10 px-4 py-2 text-sm font-medium text-[var(--text-primary)] hover:bg-black/5 disabled:opacity-50">
+              <Sparkles size={16} /> {reflecting ? 'Reflecting...' : 'Reflect'}
+            </button>
+          )}
+          <button onClick={() => setCreateModal(true)} className="btn-primary flex items-center gap-2 px-4 py-2 text-sm">
+            <Plus size={16} /> New Entry
+          </button>
+        </div>
       </div>
+
+      {reflection && (
+        <div className="glass-card mb-6 p-5 animate-fade-in">
+          <div className="mb-3 flex items-center justify-between">
+            <h3 className="flex items-center gap-2 font-display font-semibold text-[var(--text-primary)]"><Sparkles size={16} className="text-[var(--accent-secondary)]" /> ALORA's Reflection</h3>
+            <button onClick={() => setReflection(null)} className="text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)]">Dismiss</button>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <p className="mb-1.5 text-xs font-medium uppercase tracking-wider text-[var(--text-secondary)]">Patterns</p>
+              <ul className="space-y-1 text-sm text-[var(--text-primary)]">{reflection.patterns.map((p, i) => <li key={i}>• {p}</li>)}</ul>
+            </div>
+            <div>
+              <p className="mb-1.5 text-xs font-medium uppercase tracking-wider text-[var(--text-secondary)]">Insights</p>
+              <ul className="space-y-1 text-sm text-[var(--text-primary)]">{reflection.insights.map((p, i) => <li key={i}>• {p}</li>)}</ul>
+            </div>
+            <div>
+              <p className="mb-1.5 text-xs font-medium uppercase tracking-wider text-[var(--text-secondary)]">Challenges</p>
+              <ul className="space-y-1 text-sm text-[var(--text-primary)]">{reflection.challenges.map((p, i) => <li key={i}>• {p}</li>)}</ul>
+            </div>
+            <div>
+              <p className="mb-1.5 text-xs font-medium uppercase tracking-wider text-[var(--text-secondary)]">Suggested Actions</p>
+              <ul className="space-y-1 text-sm text-[var(--text-primary)]">{reflection.suggestedActions.map((p, i) => <li key={i}>• {p}</li>)}</ul>
+            </div>
+          </div>
+        </div>
+      )}
 
       {loading ? (
         <div className="space-y-3">

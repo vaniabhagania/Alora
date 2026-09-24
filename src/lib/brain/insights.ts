@@ -25,7 +25,7 @@ function detectTaskBehavior(ctx: StudentContext) {
     results.push({
       insight_type: 'task_behavior',
       title: `${ctx.overdueTasks.length} overdue tasks`,
-      description: `You have ${ctx.overdueTasks.length} overdue tasks. The oldest has been pending since ${new Date(ctx.overdueTasks[0].deadline).toLocaleDateString()}. This may indicate avoidance rather than lack of time.`,
+      description: `You have ${ctx.overdueTasks.length} overdue tasks. The oldest has been pending since ${new Date(ctx.overdueTasks[0].deadline!).toLocaleDateString()}. This may indicate avoidance rather than lack of time.`,
       evidence: ctx.overdueTasks.slice(0, 3).map((t) => ({
         source: 'task',
         detail: `${t.title} — due ${t.deadline ? new Date(t.deadline).toLocaleDateString() : 'no deadline'}`,

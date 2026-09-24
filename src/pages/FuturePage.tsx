@@ -5,7 +5,7 @@ import { useToast } from '@/lib/toast';
 import type { Identity, Goal, Habit } from '@/lib/types';
 import { Modal, ConfirmModal } from '@/components/Modal';
 import { EmptyState, Skeleton, ProgressRing, ProgressBar } from '@/components/ui';
-import { Plus, Sparkles, Trash2, Target, Repeat, TrendingUp, CheckCircle2 } from 'lucide-react';
+import { Plus, Sparkles, Trash2, Target, Repeat, CheckCircle2 } from 'lucide-react';
 
 type Tab = 'identities' | 'goals' | 'habits';
 

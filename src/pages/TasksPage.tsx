@@ -6,7 +6,7 @@ import type { Task } from '@/lib/types';
 import { cascadeTaskCompletion, cascadeTaskCreation } from '@/lib/brain/cascade';
 import { Modal, ConfirmModal } from '@/components/Modal';
 import { EmptyState, Skeleton } from '@/components/ui';
-import { Plus, CheckCircle2, Circle, Clock, AlertTriangle, Trash2, Calendar, Flag } from 'lucide-react';
+import { Plus, CheckCircle2, Circle, Clock, Trash2, Flag } from 'lucide-react';
 
 type View = 'today' | 'week' | 'upcoming' | 'no_date' | 'overdue' | 'completed';
 
@@ -188,16 +188,19 @@ function CreateTaskModal({ onClose, onCreated }: { onClose: () => void; onCreate
   async function handleCreate() {
     if (!title.trim()) { toast.show('Please enter a title.', 'error'); return; }
     setSaving(true);
-    const { error } = await supabase.from('tasks').insert({
+    const { data, error } = await supabase.from('tasks').insert({
       title,
       description,
       priority,
       category,
       deadline: deadline ? new Date(deadline).toISOString() : null,
       estimated_effort: estimatedEffort,
-    });
+    }).select('*').maybeSingle();
     setSaving(false);
-    if (error) { toast.show('Failed to create task.', 'error'); } else { toast.show('Task created.'); onCreated(); }
+    if (error) { toast.show('Failed to create task.', 'error'); return; }
+    if (data) await cascadeTaskCreation(data as Task);
+    toast.show('Task created.');
+    onCreated();
   }
 
   return (

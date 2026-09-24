@@ -4,10 +4,10 @@ import { useAuth } from '@/lib/auth';
 import { useToast } from '@/lib/toast';
 import { aiProvider } from '@/lib/ai/provider';
 import type { AIQuizQuestion } from '@/lib/ai/types';
-import type { QuizAttempt, QuizQuestion, Course, Topic, ClassSession, ClassLog } from '@/lib/types';
+import type { QuizAttempt, Topic, ClassSession, ClassLog } from '@/lib/types';
 import { cascadeQuizResults } from '@/lib/brain/cascade';
 import { EmptyState, LoadingSpinner, ProgressRing } from '@/components/ui';
-import { Brain, CheckCircle2, XCircle, Plus, Lightbulb, TrendingUp, RotateCcw } from 'lucide-react';
+import { Brain, CheckCircle2, XCircle, Lightbulb, TrendingUp, RotateCcw } from 'lucide-react';
 
 type QuizState = 'idle' | 'generating' | 'active' | 'results';
 
@@ -20,7 +20,6 @@ export function QuizPage() {
   const [answers, setAnswers] = useState<Record<number, string>>({});
   const [loading, setLoading] = useState(true);
   const [attempts, setAttempts] = useState<QuizAttempt[]>([]);
-  const [courses, setCourses] = useState<Course[]>([]);
   const [topics, setTopics] = useState<Topic[]>([]);
   const [recentClasses, setRecentClasses] = useState<ClassSession[]>([]);
   const [classLogs, setClassLogs] = useState<ClassLog[]>([]);
@@ -28,15 +27,13 @@ export function QuizPage() {
   const loadData = useCallback(async () => {
     if (!profile) return;
     setLoading(true);
-    const [a, c, t, cl, clg] = await Promise.all([
+    const [a, t, cl, clg] = await Promise.all([
       supabase.from('quiz_attempts').select('*').order('completed_at', { ascending: false }).limit(10),
-      supabase.from('courses').select('*').limit(20),
       supabase.from('topics').select('*').limit(50),
       supabase.from('classes').select('*').order('session_date', { ascending: false }).limit(10),
       supabase.from('class_logs').select('*').order('created_at', { ascending: false }).limit(10),
     ]);
     setAttempts((a.data as QuizAttempt[]) || []);
-    setCourses((c.data as Course[]) || []);
     setTopics((t.data as Topic[]) || []);
     setRecentClasses((cl.data as ClassSession[]) || []);
     setClassLogs((clg.data as ClassLog[]) || []);

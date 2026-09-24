@@ -74,7 +74,7 @@ class LocalAIProvider implements AIProvider {
   async generateQuiz(
     topics: string[],
     weakTopics: string[],
-    _mix: { recent: number; older: number; weak: number; upcoming: number; lateral: number }
+    mix: { recent: number; older: number; weak: number; upcoming: number; lateral: number }
   ): Promise<AIQuizQuestion[]> {
     await delay(800);
     const questions: AIQuizQuestion[] = [];
@@ -101,7 +101,9 @@ class LocalAIProvider implements AIProvider {
       });
     }
 
-    if (weakTopics.length > 0) {
+    // mix.weak / mix.lateral are 0-100 weights from Settings — a weight of 0
+    // means the user asked to exclude that question type entirely.
+    if (weakTopics.length > 0 && mix.weak > 0) {
       questions.push({
         question_type: 'explain',
         question: `Explain ${weakTopics[0]} in your own words. What is it, why does it matter, and where does it apply?`,
@@ -113,44 +115,88 @@ class LocalAIProvider implements AIProvider {
       });
     }
 
-    questions.push({
-      question_type: 'lateral',
-      question: `If you had to teach ${allTopics[0] || 'your subject'} to a 10-year-old using only a pizza as a metaphor, how would you do it?`,
-      options: [],
-      correct_answer: `Any creative answer that demonstrates deep understanding through analogy.`,
-      explanation: `Lateral thinking questions test whether you truly understand a concept well enough to explain it through unexpected analogies.`,
-      topic: allTopics[0] || 'General',
-      difficulty: 'hard',
-    });
+    if (mix.lateral > 0) {
+      questions.push({
+        question_type: 'lateral',
+        question: `If you had to teach ${allTopics[0] || 'your subject'} to a 10-year-old using only a pizza as a metaphor, how would you do it?`,
+        options: [],
+        correct_answer: `Any creative answer that demonstrates deep understanding through analogy.`,
+        explanation: `Lateral thinking questions test whether you truly understand a concept well enough to explain it through unexpected analogies.`,
+        topic: allTopics[0] || 'General',
+        difficulty: 'hard',
+      });
+    }
 
     return questions;
   }
 
   async summarizeClass(rawInput: string): Promise<AIClassSummary> {
     await delay(600);
+    const sentences = splitSentences(rawInput);
+    const questions = sentences.filter((s) => s.trim().endsWith('?'));
+    const weakAreas = sentences.filter((s) => /\b(confus\w*|don'?t (get|understand)|unclear|struggl\w*|lost|hard to)\b/i.test(s));
+    const learnings = sentences.filter((s) => /\b(learn(ed)?|realiz\w*|understood|now (i )?(get|know)|makes sense)\b/i.test(s));
+    const understanding: AIClassSummary['understanding'] =
+      weakAreas.length > learnings.length ? 'low' : learnings.length > weakAreas.length ? 'high' : 'medium';
+
     return {
-      course: 'Detected Course',
-      topics: ['Topic from input'],
-      understanding: 'medium',
-      weakAreas: ['Areas of confusion'],
+      course: '',
+      topics: [],
+      understanding,
+      weakAreas: weakAreas.length ? weakAreas.slice(0, 5) : [],
       tasks: [],
-      questions: ['Questions raised in input'],
-      learnings: ['Key takeaways from input'],
+      questions: questions.slice(0, 5),
+      learnings: learnings.slice(0, 5),
     };
   }
 
   async extractTasks(rawInput: string): Promise<AITaskExtraction> {
     await delay(500);
-    return { tasks: [] };
+    const sentences = splitSentences(rawInput);
+    const taskLike = sentences.filter((s) => /\b(due|deadline|submit|assignment|homework|by (mon|tue|wed|thu|fri|sat|sun)|need to|have to|must)\b/i.test(s));
+    const urgent = /\b(urgent|asap|tonight|tomorrow)\b/i;
+    return {
+      tasks: taskLike.slice(0, 5).map((s) => ({
+        title: s.trim().replace(/^(and|also|then)\s+/i, '').slice(0, 120),
+        deadline: '',
+        priority: urgent.test(s) ? 'high' : 'medium',
+        category: 'academic',
+      })),
+    };
   }
 
   async reflect(journalEntries: string[]): Promise<AIReflection> {
     await delay(700);
+    if (journalEntries.length === 0) {
+      return { patterns: [], insights: [], challenges: [], suggestedActions: [] };
+    }
+
+    const emotionCounts = new Map<string, number>();
+    const challengeEntries: string[] = [];
+    for (const entry of journalEntries) {
+      const states = detectEmotionalState(entry);
+      for (const s of states) emotionCounts.set(s, (emotionCounts.get(s) || 0) + 1);
+      if (states.length > 0 || /\b(struggl|difficult|hard|can'?t|stuck)\b/i.test(entry)) {
+        challengeEntries.push(entry.length > 140 ? entry.slice(0, 140) + '…' : entry);
+      }
+    }
+    const sortedEmotions = [...emotionCounts.entries()].sort((a, b) => b[1] - a[1]);
+    const topEmotion = sortedEmotions[0];
+
+    const patterns = topEmotion
+      ? [`"${topEmotion[0]}" shows up in ${topEmotion[1]} of your last ${journalEntries.length} entries — that's a real pattern, not a one-off.`]
+      : [`No single emotional theme dominates your last ${journalEntries.length} entries — that reads as steady, not stuck.`];
+    const insights = topEmotion
+      ? [`Recurring "${topEmotion[0]}" usually has a specific, findable trigger. Worth naming it directly instead of letting it stay vague.`]
+      : ['Your entries vary in tone entry to entry — normal, as long as the lows are recovering, not compounding.'];
+
     return {
-      patterns: ['Pattern detected across entries'],
-      insights: ['Insight from reflection'],
-      challenges: ['Recurring challenge'],
-      suggestedActions: ['Suggested next action'],
+      patterns,
+      insights,
+      challenges: challengeEntries.slice(0, 3),
+      suggestedActions: topEmotion
+        ? ['Name the specific trigger behind this pattern, not just the feeling', 'Bring this pattern up next time you talk to Alora']
+        : ['Keep journaling consistently — patterns need volume to show up clearly'],
     };
   }
 
@@ -195,6 +241,13 @@ class LocalAIProvider implements AIProvider {
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function splitSentences(text: string): string[] {
+  return text
+    .split(/(?<=[.!?])\s+|\n+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
 }
 
 function generateEmotionalResponse(emotions: string[], context: ChatContext): AIChatResponse {

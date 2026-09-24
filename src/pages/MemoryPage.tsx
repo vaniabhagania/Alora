@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth';
 import { useToast } from '@/lib/toast';
+import { aiProvider } from '@/lib/ai/provider';
 import type { Memory, MemoryCategory } from '@/lib/types';
 import { Modal, ConfirmModal } from '@/components/Modal';
 import { EmptyState, Skeleton } from '@/components/ui';
@@ -32,6 +33,8 @@ export function MemoryPage() {
   const [filterCategory, setFilterCategory] = useState<MemoryCategory | 'all'>('all');
   const [createModal, setCreateModal] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const [searchResultIds, setSearchResultIds] = useState<string[] | null>(null);
+  const [searching, setSearching] = useState(false);
 
   const loadMemories = useCallback(async () => {
     if (!profile) return;
@@ -53,11 +56,25 @@ export function MemoryPage() {
     setDeleteTarget(null);
   }
 
-  const filtered = memories.filter((m) => {
-    if (filterCategory !== 'all' && m.category !== filterCategory) return false;
-    if (search && !m.content.toLowerCase().includes(search.toLowerCase()) && !m.tags.some((t) => t.toLowerCase().includes(search.toLowerCase()))) return false;
-    return true;
-  });
+  // Relevance-ranked search (debounced) instead of a plain substring match,
+  // using aiProvider.searchMemories — the same interface Claude will use
+  // once connected, so search quality improves automatically then.
+  useEffect(() => {
+    if (!search.trim()) { setSearchResultIds(null); return; }
+    setSearching(true);
+    const handle = setTimeout(async () => {
+      const pool = memories.filter((m) => filterCategory === 'all' || m.category === filterCategory);
+      const results = await aiProvider.searchMemories(search, pool.map((m) => ({ id: m.id, content: m.content, category: m.category })));
+      setSearchResultIds(results.map((r) => r.memoryId));
+      setSearching(false);
+    }, 300);
+    return () => clearTimeout(handle);
+  }, [search, filterCategory, memories]);
+
+  const categoryFiltered = memories.filter((m) => filterCategory === 'all' || m.category === filterCategory);
+  const filtered = searchResultIds
+    ? searchResultIds.map((id) => memories.find((m) => m.id === id)).filter((m): m is Memory => !!m)
+    : categoryFiltered;
 
   const categoryCounts: Record<string, number> = {};
   memories.forEach((m) => { categoryCounts[m.category] = (categoryCounts[m.category] || 0) + 1; });
@@ -78,6 +95,7 @@ export function MemoryPage() {
         <div className="relative flex-1">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-secondary)]" />
           <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search memories..." className="w-full rounded-xl border border-black/10 bg-black/[0.03] py-2.5 pl-10 pr-4 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50" />
+          {searching && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-[var(--text-secondary)]">Searching...</span>}
         </div>
       </div>
 
