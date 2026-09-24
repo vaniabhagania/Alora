@@ -7,7 +7,7 @@ import type { Memory, MemoryCategory } from '@/lib/types';
 import { Modal, ConfirmModal } from '@/components/Modal';
 import { EmptyState, Skeleton } from '@/components/ui';
 import { AttachmentList } from '@/components/AttachmentList';
-import { Plus, Database, Trash2, Search, Tag } from 'lucide-react';
+import { Plus, Database, Trash2, Search, Tag, Pencil } from 'lucide-react';
 
 const CATEGORIES: MemoryCategory[] = [
   'academic', 'personal', 'goals', 'preferences', 'habits', 'patterns', 'projects', 'important_events', 'creative_ideas',
@@ -33,6 +33,7 @@ export function MemoryPage() {
   const [search, setSearch] = useState('');
   const [filterCategory, setFilterCategory] = useState<MemoryCategory | 'all'>('all');
   const [createModal, setCreateModal] = useState(false);
+  const [editModal, setEditModal] = useState<Memory | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [searchResultIds, setSearchResultIds] = useState<string[] | null>(null);
   const [searching, setSearching] = useState(false);
@@ -132,7 +133,10 @@ export function MemoryPage() {
                   <span className="text-xs text-[var(--text-secondary)]">{new Date(m.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
                   {m.source !== 'manual' && <span className="text-xs text-[var(--accent-secondary)]">{m.source}</span>}
                 </div>
-                <button onClick={() => setDeleteTarget(m.id)} className="rounded-lg p-1.5 text-[var(--text-secondary)] opacity-0 transition-opacity hover:bg-rose-500/10 hover:text-rose-400 group-hover:opacity-100"><Trash2 size={14} /></button>
+                <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+                  <button onClick={() => setEditModal(m)} className="rounded-lg p-1.5 text-[var(--text-secondary)] hover:bg-ink/5 hover:text-[var(--text-primary)]"><Pencil size={14} /></button>
+                  <button onClick={() => setDeleteTarget(m.id)} className="rounded-lg p-1.5 text-[var(--text-secondary)] hover:bg-rose-500/10 hover:text-rose-400"><Trash2 size={14} /></button>
+                </div>
               </div>
               <p className="text-sm leading-relaxed text-[var(--text-primary)]">{m.content}</p>
               {m.tags.length > 0 && (
@@ -154,33 +158,40 @@ export function MemoryPage() {
         <CreateMemoryModal onClose={() => setCreateModal(false)} onCreated={() => { setCreateModal(false); loadMemories(); }} />
       )}
 
+      {editModal && (
+        <CreateMemoryModal memory={editModal} onClose={() => setEditModal(null)} onCreated={() => { setEditModal(null); loadMemories(); }} />
+      )}
+
       <ConfirmModal open={!!deleteTarget} onClose={() => setDeleteTarget(null)} onConfirm={handleDelete} title="Delete Memory" message="Are you sure you want to delete this memory? This cannot be undone." confirmLabel="Delete" danger />
     </div>
   );
 }
 
-function CreateMemoryModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
+function CreateMemoryModal({ memory, onClose, onCreated }: { memory?: Memory; onClose: () => void; onCreated: () => void }) {
   const toast = useToast();
-  const [content, setContent] = useState('');
-  const [category, setCategory] = useState<MemoryCategory>('academic');
-  const [importance, setImportance] = useState('normal');
-  const [tags, setTags] = useState('');
+  const [content, setContent] = useState(memory?.content || '');
+  const [category, setCategory] = useState<MemoryCategory>(memory?.category || 'academic');
+  const [importance, setImportance] = useState(memory?.importance || 'normal');
+  const [tags, setTags] = useState(memory?.tags?.join(', ') || '');
   const [saving, setSaving] = useState(false);
 
   async function handleCreate() {
     if (!content.trim()) { toast.show('Please write something.', 'error'); return; }
     setSaving(true);
-    const { error } = await supabase.from('memories').insert({
+    const payload = {
       content, category, importance,
       tags: tags ? tags.split(',').map((t) => t.trim()).filter(Boolean) : [],
-    });
+    };
+    const { error } = memory
+      ? await supabase.from('memories').update(payload).eq('id', memory.id)
+      : await supabase.from('memories').insert(payload);
     setSaving(false);
     if (error) { toast.show('Failed to save memory.', 'error'); }
-    else { toast.show('Memory saved.'); onCreated(); }
+    else { toast.show(memory ? 'Memory updated.' : 'Memory saved.'); onCreated(); }
   }
 
   return (
-    <Modal open={true} onClose={onClose} title="New Memory" maxWidth="600px">
+    <Modal open={true} onClose={onClose} title={memory ? 'Edit Memory' : 'New Memory'} maxWidth="600px">
       <div className="space-y-4">
         <div>
           <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Content</label>
