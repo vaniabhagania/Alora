@@ -1,6 +1,6 @@
 // ALORA Chat — Edge Function
 //
-// Runs server-side so the OpenAI API key never reaches the browser bundle
+// Runs server-side so the Gemini API key never reaches the browser bundle
 // (see the "AI & Privacy" note in Settings, which promised exactly this).
 //
 // Responsibilities:
@@ -15,13 +15,13 @@
 //    topics, etc. — the "one brain"), the user's own custom instructions
 //    (Settings → Customize Alora), and a small sample of the user's own past
 //    messages so replies can loosely mirror how they naturally write.
-// 4. Call OpenAI, persist both sides of the exchange into chat_conversations
-//    / chat_messages (unified memory), log an activity event, and return the
-//    reply.
+// 4. Call Gemini (free tier), persist both sides of the exchange into
+//    chat_conversations / chat_messages (unified memory), log an activity
+//    event, and return the reply.
 //
 // Deploy: supabase functions deploy alora-chat
 // Secret (set by the project owner, never by this code):
-//   supabase secrets set OPENAI_API_KEY=sk-...
+//   supabase secrets set GEMINI_API_KEY=...
 
 import { createClient } from 'npm:@supabase/supabase-js@2';
 
@@ -163,9 +163,9 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    const apiKey = Deno.env.get('OPENAI_API_KEY');
+    const apiKey = Deno.env.get('GEMINI_API_KEY');
     if (!apiKey) {
-      return json({ error: 'OPENAI_API_KEY is not configured for this project' }, 500);
+      return json({ error: 'GEMINI_API_KEY is not configured for this project' }, 500);
     }
 
     // ---- Gather personalization: custom instructions + the user's own voice ----
@@ -187,32 +187,43 @@ Deno.serve(async (req: Request) => {
       systemPrompt += `\n\n## Mirroring their voice\nHere are things this user has written in their own words. Notice their natural tone, phrasing, formality, and energy, and let your replies loosely echo that register — stay recognizably ALORA, just don't sound like a generic assistant to them.\n${styleSample.map((s) => `- ${s.slice(0, 200)}`).join('\n')}`;
     }
 
-    const openaiMessages = messages
+    // Gemini uses "model" instead of "assistant" for the assistant role,
+    // and rejects a conversation that doesn't start with "user" — the
+    // client always seeds an opening greeting from Alora, so trim any
+    // leading assistant turns before sending.
+    const geminiContents = messages
       .filter((m) => m.role === 'user' || m.role === 'assistant')
-      .map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content }));
-
-    const openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        max_tokens: 1024,
-        messages: [{ role: 'system', content: systemPrompt }, ...openaiMessages],
-      }),
-    });
-
-    if (!openaiRes.ok) {
-      const errBody = await openaiRes.text();
-      throw new Error(`OpenAI API error (${openaiRes.status}): ${errBody}`);
+      .map((m) => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] }));
+    while (geminiContents.length && geminiContents[0].role === 'model') {
+      geminiContents.shift();
     }
 
-    const completion = await openaiRes.json();
-    const choice = completion.choices?.[0];
+    const model = 'gemini-2.5-flash';
+    const geminiRes = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+      {
+        method: 'POST',
+        headers: {
+          'x-goog-api-key': apiKey,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          contents: geminiContents,
+          systemInstruction: { parts: [{ text: systemPrompt }] },
+          generationConfig: { maxOutputTokens: 1024 },
+        }),
+      },
+    );
 
-    if (choice?.finish_reason === 'content_filter') {
+    if (!geminiRes.ok) {
+      const errBody = await geminiRes.text();
+      throw new Error(`Gemini API error (${geminiRes.status}): ${errBody}`);
+    }
+
+    const completion = await geminiRes.json();
+    const candidate = completion.candidates?.[0];
+
+    if (candidate?.finishReason === 'SAFETY') {
       return json({
         message: "I don't have a good answer for that one. Let's try a different angle — what's actually on your mind?",
         insights: [],
@@ -221,7 +232,7 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    const assistantText = (choice?.message?.content as string | undefined)?.trim() || "I'm here. Could you say that another way?";
+    const assistantText = (candidate?.content?.parts?.[0]?.text as string | undefined)?.trim() || "I'm here. Could you say that another way?";
 
     // ---- Persist the exchange (unified memory) ----
     let conversationId: string | null = null;
