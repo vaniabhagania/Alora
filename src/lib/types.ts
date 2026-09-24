@@ -355,6 +355,7 @@ export interface Settings {
   ai_provider: string;
   custom_chat_instructions: string;
   hidden_nav_items: string[];
+  theme_mode: 'light' | 'dark';
   notifications_enabled: boolean;
   created_at: string;
   updated_at: string;

@@ -136,7 +136,7 @@ export function HomePage({ onNavigate }: HomeProps) {
             {todayTasks.length > 0 ? (
               <div className="space-y-2">
                 {todayTasks.map((t) => (
-                  <div key={t.id} className="flex items-center gap-3 rounded-lg border border-black/8 bg-black/[0.02] px-3 py-2">
+                  <div key={t.id} className="flex items-center gap-3 rounded-lg border border-ink/8 bg-ink/[0.02] px-3 py-2">
                     <div className={`h-2 w-2 rounded-full ${t.priority === 'urgent' ? 'bg-rose-400' : t.priority === 'high' ? 'bg-orange-400' : 'bg-[var(--accent)]'}`} />
                     <span className="flex-1 text-sm text-[var(--text-primary)]">{t.title}</span>
                   </div>
@@ -153,7 +153,7 @@ export function HomePage({ onNavigate }: HomeProps) {
             {upcomingTasks.length > 0 ? (
               <div className="space-y-2">
                 {upcomingTasks.slice(0, 5).map((t) => (
-                  <div key={t.id} className="flex items-center gap-3 rounded-lg border border-black/8 bg-black/[0.02] px-3 py-2">
+                  <div key={t.id} className="flex items-center gap-3 rounded-lg border border-ink/8 bg-ink/[0.02] px-3 py-2">
                     <Clock size={14} className="shrink-0 text-[var(--text-secondary)]" />
                     <span className="flex-1 truncate text-sm text-[var(--text-primary)]">{t.title}</span>
                     <span className="shrink-0 text-xs text-[var(--text-secondary)]">
@@ -194,7 +194,7 @@ export function HomePage({ onNavigate }: HomeProps) {
                 {recentClasses.map((c) => {
                   const course = courses.find((co) => co.id === c.course_id);
                   return (
-                    <div key={c.id} className="flex items-center gap-3 rounded-lg border border-black/8 bg-black/[0.02] px-3 py-2">
+                    <div key={c.id} className="flex items-center gap-3 rounded-lg border border-ink/8 bg-ink/[0.02] px-3 py-2">
                       <div className="h-2 w-2 rounded-full" style={{ background: course?.color || 'var(--accent)' }} />
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm text-[var(--text-primary)]">{c.title}</p>
@@ -227,7 +227,7 @@ export function HomePage({ onNavigate }: HomeProps) {
                       <span className="text-sm text-[var(--text-primary)]">{i.name}</span>
                       <span className="text-xs text-[var(--text-secondary)]">{i.progress}%</span>
                     </div>
-                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-black/5">
+                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-ink/5">
                       <div className="h-full rounded-full" style={{ width: `${i.progress}%`, background: i.color }} />
                     </div>
                   </div>

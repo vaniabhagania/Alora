@@ -109,7 +109,7 @@ export function ChatPage() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="border-b border-black/8 px-4 py-4 md:px-8">
+      <div className="border-b border-ink/8 px-4 py-4 md:px-8">
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ background: 'var(--accent)', border: '2px solid var(--accent-secondary)' }}>
             <Sparkles size={20} className="text-white" />
@@ -168,7 +168,7 @@ export function ChatPage() {
             <button onClick={applyNavSuggestion} className="btn-primary px-3 py-1.5 text-xs">
               {navSuggestion.action === 'hide' ? 'Hide it' : 'Bring it back'}
             </button>
-            <button onClick={() => setNavSuggestion(null)} className="rounded-lg p-1.5 text-[var(--text-secondary)] hover:bg-black/5">
+            <button onClick={() => setNavSuggestion(null)} className="rounded-lg p-1.5 text-[var(--text-secondary)] hover:bg-ink/5">
               <X size={14} />
             </button>
           </div>
@@ -179,7 +179,7 @@ export function ChatPage() {
         <div className="mx-auto max-w-3xl px-4 pb-2 md:px-8">
           <div className="flex flex-wrap gap-2">
             {suggestions.map((s) => (
-              <button key={s} onClick={() => setInput(s)} className="rounded-full border border-black/10 bg-black/[0.03] px-3 py-1.5 text-xs text-[var(--text-secondary)] transition-colors hover:bg-black/5 hover:text-[var(--text-primary)]">
+              <button key={s} onClick={() => setInput(s)} className="rounded-full border border-ink/10 bg-ink/[0.03] px-3 py-1.5 text-xs text-[var(--text-secondary)] transition-colors hover:bg-ink/5 hover:text-[var(--text-primary)]">
                 {s}
               </button>
             ))}
@@ -187,7 +187,7 @@ export function ChatPage() {
         </div>
       )}
 
-      <div className="border-t border-black/8 px-4 py-4 md:px-8">
+      <div className="border-t border-ink/8 px-4 py-4 md:px-8">
         <div className="mx-auto flex max-w-3xl items-end gap-2">
           <textarea
             value={input}
@@ -195,7 +195,7 @@ export function ChatPage() {
             onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
             placeholder="Ask Alora anything..."
             rows={1}
-            className="flex-1 resize-none rounded-xl border border-black/10 bg-black/[0.03] px-4 py-3 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50"
+            className="flex-1 resize-none rounded-xl border border-ink/10 bg-ink/[0.03] px-4 py-3 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50"
             style={{ maxHeight: '120px' }}
           />
           <button onClick={handleSend} disabled={!input.trim() || thinking} className="btn-primary flex h-11 w-11 shrink-0 items-center justify-center">

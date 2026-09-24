@@ -64,7 +64,7 @@ export function AuthPage() {
         </div>
 
         <div className="glass-card p-8">
-          <div className="mb-6 flex gap-2 rounded-xl bg-black/[0.03] p-1">
+          <div className="mb-6 flex gap-2 rounded-xl bg-ink/[0.03] p-1">
             <button
               onClick={() => setMode('signin')}
               className={`flex-1 rounded-lg py-2 text-sm font-medium transition-all ${
@@ -98,7 +98,7 @@ export function AuthPage() {
                     value={displayName}
                     onChange={(e) => setDisplayName(e.target.value)}
                     placeholder="Your name"
-                    className="w-full rounded-xl border border-black/10 bg-black/[0.03] py-2.5 pl-10 pr-4 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 transition-colors focus:border-[var(--accent)]/50"
+                    className="w-full rounded-xl border border-ink/10 bg-ink/[0.03] py-2.5 pl-10 pr-4 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 transition-colors focus:border-[var(--accent)]/50"
                   />
                 </div>
               </div>
@@ -113,7 +113,7 @@ export function AuthPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="you@example.com"
-                  className="w-full rounded-xl border border-black/10 bg-black/[0.03] py-2.5 pl-10 pr-4 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 transition-colors focus:border-[var(--accent)]/50"
+                  className="w-full rounded-xl border border-ink/10 bg-ink/[0.03] py-2.5 pl-10 pr-4 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 transition-colors focus:border-[var(--accent)]/50"
                 />
               </div>
             </div>
@@ -128,7 +128,7 @@ export function AuthPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="At least 6 characters"
-                  className="w-full rounded-xl border border-black/10 bg-black/[0.03] py-2.5 pl-10 pr-4 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 transition-colors focus:border-[var(--accent)]/50"
+                  className="w-full rounded-xl border border-ink/10 bg-ink/[0.03] py-2.5 pl-10 pr-4 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 transition-colors focus:border-[var(--accent)]/50"
                 />
               </div>
             </div>
