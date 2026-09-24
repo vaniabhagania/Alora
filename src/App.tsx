@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { AuthProvider, useAuth } from '@/lib/auth';
 import { ToastProvider } from '@/lib/toast';
 import { WorldProvider } from '@/lib/worlds';
+import { SettingsProvider } from '@/lib/settingsContext';
 import { AppShell } from '@/components/AppShell';
 import { AuthPage } from '@/pages/AuthPage';
 import { HomePage } from '@/pages/HomePage';
@@ -42,9 +43,11 @@ function AppContent() {
   };
 
   return (
-    <WorldProvider>
-      <AppShell currentPage={currentPage} onNavigate={setCurrentPage}>{pages[currentPage] || pages.home}</AppShell>
-    </WorldProvider>
+    <SettingsProvider>
+      <WorldProvider>
+        <AppShell currentPage={currentPage} onNavigate={setCurrentPage}>{pages[currentPage] || pages.home}</AppShell>
+      </WorldProvider>
+    </SettingsProvider>
   );
 }
 

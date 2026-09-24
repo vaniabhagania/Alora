@@ -64,7 +64,7 @@ export function ProgressBar({ value, max = 100, className = '' }: ProgressBarPro
         className="h-full rounded-full transition-all duration-700"
         style={{
           width: `${pct}%`,
-          background: 'linear-gradient(90deg, var(--accent), var(--accent-secondary))',
+          background: 'var(--accent)',
         }}
       />
     </div>

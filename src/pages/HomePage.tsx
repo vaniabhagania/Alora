@@ -91,7 +91,7 @@ export function HomePage({ onNavigate }: HomeProps) {
       >
         <div
           className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl animate-pulse-glow"
-          style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent-secondary))' }}
+          style={{ background: 'var(--accent)', border: '2px solid var(--accent-secondary)' }}
         >
           <MessageSquare size={24} className="text-white" />
         </div>

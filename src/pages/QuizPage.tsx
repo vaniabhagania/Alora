@@ -231,7 +231,7 @@ export function QuizPage() {
           <span className="text-xs text-[var(--text-secondary)]">{q.topic} · {q.difficulty}</span>
         </div>
         <div className="mb-6 h-1.5 w-full overflow-hidden rounded-full bg-black/5">
-          <div className="h-full rounded-full transition-all" style={{ width: `${((currentQ + 1) / questions.length) * 100}%`, background: 'linear-gradient(90deg, var(--accent), var(--accent-secondary))' }} />
+          <div className="h-full rounded-full transition-all" style={{ width: `${((currentQ + 1) / questions.length) * 100}%`, background: 'var(--accent)' }} />
         </div>
         <div className="glass-card mb-6 p-6">
           <p className="mb-4 text-lg font-medium text-[var(--text-primary)]">{q.question}</p>
@@ -353,7 +353,7 @@ function MixBar({ label, pct }: { label: string; pct: number }) {
         <span className="text-[var(--text-primary)]">{pct}%</span>
       </div>
       <div className="h-1.5 w-full overflow-hidden rounded-full bg-black/5">
-        <div className="h-full rounded-full" style={{ width: `${pct}%`, background: 'linear-gradient(90deg, var(--accent), var(--accent-secondary))' }} />
+        <div className="h-full rounded-full" style={{ width: `${pct}%`, background: 'var(--accent)' }} />
       </div>
     </div>
   );
