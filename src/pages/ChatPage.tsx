@@ -1,10 +1,9 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth';
 import { useToast } from '@/lib/toast';
 import { aiProvider } from '@/lib/ai/provider';
 import type { ChatMessage, ChatContext } from '@/lib/ai/types';
-import type { Task, ClassSession, Course, QuizAttempt, Goal, Identity } from '@/lib/types';
+import { getStudentContext } from '@/lib/brain';
 import { EmptyState, LoadingSpinner } from '@/components/ui';
 import { Send, Sparkles, Brain } from 'lucide-react';
 
@@ -15,53 +14,32 @@ export function ChatPage() {
   const [thinking, setThinking] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  // Sourced from the unified brain (src/lib/brain) rather than ad hoc
+  // queries, so chat sees exactly the same picture of the user as every
+  // other feature — one brain, one memory.
   const loadContext = useCallback(async (): Promise<ChatContext> => {
     if (!profile) {
       return { userName: '', recentClasses: [], upcomingTasks: [], overdueTasks: [], weakTopics: [], strongTopics: [], goals: [], identities: [], streak: 0, quizAvgScore: 0 };
     }
-    const [tasksRes, classesRes, coursesRes, quizRes, goalsRes, identitiesRes, topicsRes] = await Promise.all([
-      supabase.from('tasks').select('*').order('deadline', { ascending: true }).limit(20),
-      supabase.from('classes').select('*').order('session_date', { ascending: false }).limit(10),
-      supabase.from('courses').select('*').limit(20),
-      supabase.from('quiz_attempts').select('*').order('completed_at', { ascending: false }).limit(10),
-      supabase.from('goals').select('*').eq('status', 'active').limit(5),
-      supabase.from('identities').select('*').limit(5),
-      supabase.from('topics').select('*').limit(50),
-    ]);
 
-    const tasks = (tasksRes.data as Task[]) || [];
-    const classes = (classesRes.data as ClassSession[]) || [];
-    const courses = (coursesRes.data as Course[]) || [];
-    const quizzes = (quizRes.data as QuizAttempt[]) || [];
-    const goals = (goalsRes.data as Goal[]) || [];
-    const identities = (identitiesRes.data as Identity[]) || [];
-    const topics = (topicsRes.data as { is_weak: boolean; is_strong: boolean; name: string }[]) || [];
-
-    const now = new Date();
-    const upcoming = tasks.filter((t) => t.status !== 'completed' && t.deadline && new Date(t.deadline) >= now).slice(0, 5);
-    const overdue = tasks.filter((t) => t.status !== 'completed' && t.deadline && new Date(t.deadline) < now);
-
-    const weakTopics = topics.filter((t) => t.is_weak).map((t) => t.name);
-    const strongTopics = topics.filter((t) => t.is_strong).map((t) => t.name);
-
-    const quizAvg = quizzes.length > 0
-      ? Math.round(quizzes.reduce((acc, a) => acc + (a.total_questions > 0 ? (a.correct_count / a.total_questions) * 100 : 0), 0) / quizzes.length)
-      : 0;
+    const ctx = await getStudentContext('chat');
+    const courseNameById = new Map(ctx.courses.map((c) => [c.id, c.name]));
 
     return {
       userName: profile.display_name || 'there',
-      recentClasses: classes.map((c) => {
-        const course = courses.find((co) => co.id === c.course_id);
-        return { course: course?.name || 'Unknown', title: c.title, date: c.session_date };
-      }),
-      upcomingTasks: upcoming.map((t) => ({ title: t.title, deadline: t.deadline!, priority: t.priority })),
-      overdueTasks: overdue.map((t) => ({ title: t.title, deadline: t.deadline! })),
-      weakTopics,
-      strongTopics,
-      goals: goals.map((g) => ({ title: g.title, progress: g.progress })),
-      identities: identities.map((i) => ({ name: i.name, progress: i.progress })),
-      streak: profile.streak_days || 0,
-      quizAvgScore: quizAvg,
+      recentClasses: ctx.recentClasses.slice(0, 10).map((c) => ({
+        course: courseNameById.get(c.course_id) || 'Unknown',
+        title: c.title,
+        date: c.session_date,
+      })),
+      upcomingTasks: ctx.upcomingTasks.slice(0, 5).map((t) => ({ title: t.title, deadline: t.deadline!, priority: t.priority })),
+      overdueTasks: ctx.overdueTasks.map((t) => ({ title: t.title, deadline: t.deadline! })),
+      weakTopics: ctx.weakTopics.map((w) => w.name),
+      strongTopics: ctx.strongTopics,
+      goals: ctx.activeGoals.map((g) => ({ title: g.title, progress: g.progress })),
+      identities: ctx.identities.map((i) => ({ name: i.name, progress: i.progress })),
+      streak: ctx.streak,
+      quizAvgScore: ctx.quizAverage,
     };
   }, [profile]);
 

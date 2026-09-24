@@ -16,6 +16,6 @@ export const NAV_ITEMS: NavItem[] = [
   { id: 'future', label: 'My Future', icon: Sparkles },
   { id: 'novel', label: 'Novel', icon: BookA },
   { id: 'memory', label: 'Memory', icon: Database },
-  { id: 'worlds', label: 'Your Worlds', icon: Globe },
+  { id: 'worlds', label: 'Vibe', icon: Globe },
   { id: 'settings', label: 'Settings', icon: Settings },
 ];

@@ -65,7 +65,7 @@ export function WorldsPage({ onNavigate }: WorldsPageProps) {
   return (
     <div className="mx-auto max-w-6xl px-4 py-6 md:px-8 md:py-8">
       <div className="mb-8 text-center">
-        <h1 className="mb-2 font-display text-3xl font-bold text-[var(--text-primary)] md:text-4xl">Your Worlds</h1>
+        <h1 className="mb-2 font-display text-3xl font-bold text-[var(--text-primary)] md:text-4xl">Vibe</h1>
         <p className="text-sm text-[var(--text-secondary)]">Build the atmosphere you're living in.</p>
         <p className="mt-1 text-xs text-[var(--text-secondary)]/70">Your interface doesn't need a theme. It needs a feeling.</p>
       </div>

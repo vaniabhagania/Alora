@@ -353,6 +353,7 @@ export interface Settings {
   quiz_mix: { recent: number; older: number; weak: number; upcoming: number; lateral: number };
   active_theme_id: string | null;
   ai_provider: string;
+  custom_chat_instructions: string;
   notifications_enabled: boolean;
   created_at: string;
   updated_at: string;

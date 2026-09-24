@@ -21,3 +21,6 @@ dist-ssr
 *.sln
 *.sw?
 .env
+.claude
+supabase/.temp
+zip-extract

@@ -9,20 +9,30 @@ export function AuthPage() {
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [error, setError] = useState('');
+  const [info, setInfo] = useState('');
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
+    setInfo('');
     setLoading(true);
 
     if (mode === 'signup') {
-      const { error } = await signUp(email, password, displayName || email.split('@')[0]);
+      const { error, needsEmailConfirmation } = await signUp(
+        email,
+        password,
+        displayName || email.split('@')[0]
+      );
       if (error) {
         setError(error);
         setLoading(false);
+      } else if (needsEmailConfirmation) {
+        setInfo(`We've sent a confirmation link to ${email}. Confirm it, then sign in below.`);
+        setLoading(false);
       } else {
-        // After signup, Supabase auto-signs in (email confirmation is off)
+        // A session came back immediately (email confirmation is off for
+        // this project) — onAuthStateChange will take it from here.
       }
     } else {
       const { error } = await signIn(email, password);
@@ -129,6 +139,12 @@ export function AuthPage() {
               </div>
             )}
 
+            {info && (
+              <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-4 py-2.5 text-sm text-emerald-400">
+                {info}
+              </div>
+            )}
+
             <button
               type="submit"
               disabled={loading}
@@ -151,6 +167,7 @@ export function AuthPage() {
               onClick={() => {
                 setMode(mode === 'signin' ? 'signup' : 'signin');
                 setError('');
+                setInfo('');
               }}
               className="font-medium text-[var(--accent-secondary)] hover:underline"
             >
