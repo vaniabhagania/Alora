@@ -4,8 +4,9 @@ import type { AIChatResponse, AIProvider, ChatContext, ChatMessage } from './typ
 /**
  * Real-LLM-backed chat, routed through the `alora-chat` Supabase Edge
  * Function so the provider's API key never reaches the browser bundle.
- * The edge function currently calls OpenAI — swapping providers only
- * means changing that one server-side file, not this client.
+ * The edge function currently calls Google Gemini (free tier) —
+ * swapping providers only means changing that one server-side file,
+ * not this client.
  *
  * Only `chat()` is upgraded — the rest of the AIProvider surface
  * (generateQuiz, summarizeClass, etc.) delegates to the wrapped local
