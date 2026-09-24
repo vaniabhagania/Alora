@@ -8,6 +8,7 @@ import type { JournalEntry } from '@/lib/types';
 import type { AIReflection } from '@/lib/ai/types';
 import { Modal, ConfirmModal } from '@/components/Modal';
 import { EmptyState, Skeleton } from '@/components/ui';
+import { AttachmentList } from '@/components/AttachmentList';
 import { Plus, BookOpen, Trash2, BookMarked, Smile, Calendar, Sparkles } from 'lucide-react';
 
 const MOODS = ['great', 'good', 'okay', 'low', 'rough'];
@@ -160,6 +161,9 @@ export function JournalPage() {
                   <BookMarked size={12} /> Eligible for Novel
                 </div>
               )}
+              <div className="mt-3">
+                <AttachmentList entityType="journal_entry" entityId={entry.id} />
+              </div>
             </div>
           ))}
         </div>

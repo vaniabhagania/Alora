@@ -5,6 +5,7 @@ import type { AcademicData } from '@/lib/academic';
 import type { Topic, TopicStatus } from '@/lib/types';
 import { EmptyState, ProgressBar } from '@/components/ui';
 import { CreateEntityModal, LogClassModal, type Level } from '@/components/academia/AcademiaHierarchy';
+import { AttachmentList } from '@/components/AttachmentList';
 import { ArrowLeft, BookOpen, FileText, Brain, Clock, AlertTriangle, TrendingUp, GraduationCap, CheckCircle2, Plus } from 'lucide-react';
 
 interface Props {
@@ -178,6 +179,9 @@ export function CourseView({ courseId, data, onBack, reload }: Props) {
                 <p className="text-sm font-medium text-[var(--text-primary)]">{c.title}</p>
                 <p className="text-xs text-[var(--text-secondary)]">{new Date(c.session_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}{topic ? ` · ${topic.name}` : ''}{log ? ` · Understanding: ${log.understanding_rating}/5` : ''}</p>
                 {log && log.raw_thoughts && <p className="mt-2 rounded-lg border border-ink/8 bg-ink/[0.02] px-3 py-2 text-xs text-[var(--text-secondary)]">{log.raw_thoughts}</p>}
+                <div className="mt-3">
+                  <AttachmentList entityType="class" entityId={c.id} />
+                </div>
               </div>
             );})
           )}
