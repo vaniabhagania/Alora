@@ -6,6 +6,7 @@ import { aiProvider } from '@/lib/ai/provider';
 import type { Memory, MemoryCategory } from '@/lib/types';
 import { Modal, ConfirmModal } from '@/components/Modal';
 import { EmptyState, Skeleton } from '@/components/ui';
+import { AttachmentList } from '@/components/AttachmentList';
 import { Plus, Database, Trash2, Search, Tag } from 'lucide-react';
 
 const CATEGORIES: MemoryCategory[] = [
@@ -141,6 +142,9 @@ export function MemoryPage() {
                   ))}
                 </div>
               )}
+              <div className="mt-3">
+                <AttachmentList entityType="memory" entityId={m.id} />
+              </div>
             </div>
           ))}
         </div>
