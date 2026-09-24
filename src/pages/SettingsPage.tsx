@@ -9,7 +9,7 @@ import { Globe, User, Bell, Brain, Download, Shield, LogOut, ArrowRight, LayoutG
 
 export function SettingsPage() {
   const { profile, refreshProfile, signOut } = useAuth();
-  const { activeWorld, worlds } = useWorlds();
+  const { activeWorld, worlds, deactivateWorld } = useWorlds();
   const { hiddenNavItems, toggleNavItem, themeMode, setThemeMode } = useSettings();
   const toast = useToast();
   const [displayName, setDisplayName] = useState(profile?.display_name || '');
@@ -114,7 +114,12 @@ export function SettingsPage() {
                 <p className="text-xs text-[var(--text-secondary)]">{worlds.length} world{worlds.length !== 1 ? 's' : ''} total</p>
               </div>
             </div>
-            <span className="rounded-full bg-[var(--accent)]/15 px-2.5 py-1 text-xs font-medium text-[var(--accent-secondary)]">Active</span>
+            <button
+              onClick={() => { deactivateWorld(); toast.show('Vibe disabled. Back to default appearance.'); }}
+              className="rounded-full bg-[var(--accent)]/15 px-2.5 py-1 text-xs font-medium text-[var(--accent-secondary)] hover:bg-[var(--accent)]/25"
+            >
+              Active · Disable
+            </button>
           </div>
         ) : (
           <p className="mb-4 text-xs text-[var(--text-secondary)]">No active world. ALORA is using its default appearance.</p>
