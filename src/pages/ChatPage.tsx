@@ -71,7 +71,7 @@ export function ChatPage() {
       role: 'user',
       content: input.trim(),
       timestamp: new Date().toISOString(),
-      ...(attachedImage ? { image: { mimeType: attachedImage.mimeType, data: attachedImage.base64 } } : {}),
+      ...(attachedImage ? { attachments: [{ mimeType: attachedImage.mimeType, data: attachedImage.base64 }] } : {}),
     };
     setMessages((prev) => [...prev, userMsg]);
     setInput('');
@@ -148,8 +148,8 @@ export function ChatPage() {
                     <span className="text-[10px] font-medium uppercase tracking-wider text-[var(--accent-secondary)]">ALORA</span>
                   </div>
                 )}
-                {msg.image && (
-                  <img src={`data:${msg.image.mimeType};base64,${msg.image.data}`} alt="Attached" className="mb-2 max-h-60 rounded-xl border border-ink/10" />
+                {msg.attachments?.[0] && (
+                  <img src={`data:${msg.attachments[0].mimeType};base64,${msg.attachments[0].data}`} alt="Attached" className="mb-2 max-h-60 rounded-xl border border-ink/10" />
                 )}
                 {msg.content && <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>}
               </div>

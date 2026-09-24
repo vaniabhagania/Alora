@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useToast } from '@/lib/toast';
 import { listAttachments, uploadAttachment, deleteAttachment, getAttachmentUrl, isImageType, type Attachment, type EntityType } from '@/lib/attachments';
-import { FileText, X, Upload } from 'lucide-react';
+import { FileText, X, Upload, FolderUp } from 'lucide-react';
 
 interface Props {
   entityType: EntityType;
@@ -12,8 +12,9 @@ export function AttachmentList({ entityType, entityId }: Props) {
   const toast = useToast();
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [urls, setUrls] = useState<Record<string, string>>({});
-  const [uploading, setUploading] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState<{ done: number; total: number } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const folderInputRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
     const list = await listAttachments(entityType, entityId);
@@ -26,15 +27,24 @@ export function AttachmentList({ entityType, entityId }: Props) {
     load();
   }, [load]);
 
-  async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
+  async function handleFiles(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files || []);
     e.target.value = '';
-    if (!file) return;
-    setUploading(true);
-    const result = await uploadAttachment(entityType, entityId, file);
-    setUploading(false);
-    if (result) { toast.show('File attached.'); load(); }
-    else toast.show('Upload failed.', 'error');
+    if (files.length === 0) return;
+
+    setUploading({ done: 0, total: files.length });
+    let failed = 0;
+    for (let i = 0; i < files.length; i++) {
+      const result = await uploadAttachment(entityType, entityId, files[i]);
+      if (!result) failed++;
+      setUploading({ done: i + 1, total: files.length });
+    }
+    setUploading(null);
+
+    if (failed === 0) toast.show(files.length === 1 ? 'File attached.' : `${files.length} files attached.`);
+    else if (failed === files.length) toast.show('Upload failed.', 'error');
+    else toast.show(`${files.length - failed} of ${files.length} files attached — ${failed} failed.`, 'error');
+    load();
   }
 
   async function handleDelete(a: Attachment) {
@@ -69,14 +79,32 @@ export function AttachmentList({ entityType, entityId }: Props) {
         </div>
       ))}
       <button
-        onClick={() => inputRef.current?.click()}
-        disabled={uploading}
+        onClick={() => fileInputRef.current?.click()}
+        disabled={!!uploading}
         className="flex h-20 w-20 flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-ink/15 text-[var(--text-secondary)] transition-colors hover:border-[var(--accent)]/40 hover:text-[var(--text-primary)]"
       >
         <Upload size={18} />
-        <span className="text-[9px]">{uploading ? 'Uploading...' : 'Add file'}</span>
+        <span className="text-[9px]">{uploading ? `${uploading.done}/${uploading.total}...` : 'Add file'}</span>
       </button>
-      <input ref={inputRef} type="file" className="hidden" onChange={handleFile} />
+      <button
+        onClick={() => folderInputRef.current?.click()}
+        disabled={!!uploading}
+        className="flex h-20 w-20 flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-ink/15 text-[var(--text-secondary)] transition-colors hover:border-[var(--accent)]/40 hover:text-[var(--text-primary)]"
+      >
+        <FolderUp size={18} />
+        <span className="text-[9px]">{uploading ? `${uploading.done}/${uploading.total}...` : 'Add folder'}</span>
+      </button>
+      <input ref={fileInputRef} type="file" multiple className="hidden" onChange={handleFiles} />
+      <input
+        ref={folderInputRef}
+        type="file"
+        multiple
+        // @ts-expect-error non-standard attributes for folder selection, supported in Chromium/Safari
+        webkitdirectory=""
+        directory=""
+        className="hidden"
+        onChange={handleFiles}
+      />
     </div>
   );
 }

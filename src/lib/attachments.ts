@@ -30,13 +30,21 @@ export async function listAttachments(entityType: EntityType, entityId: string):
   return (data as Attachment[]) || [];
 }
 
+// Supabase Storage object keys reject or mangle a lot of characters that
+// are perfectly normal in a filename (spaces, parentheses, unicode,
+// emoji...). Sanitize just the storage path; the original name is kept
+// in file_name for display/download.
+function sanitizeForStoragePath(name: string): string {
+  return name.replace(/[^a-zA-Z0-9._-]/g, '_');
+}
+
 export async function uploadAttachment(entityType: EntityType, entityId: string, file: File): Promise<Attachment | null> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
 
-  const path = `${user.id}/${entityType}/${entityId}/${Date.now()}-${file.name}`;
+  const path = `${user.id}/${entityType}/${entityId}/${Date.now()}-${sanitizeForStoragePath(file.name)}`;
   const { error: uploadError } = await supabase.storage.from(BUCKET).upload(path, file);
-  if (uploadError) return null;
+  if (uploadError) { console.error('Attachment upload failed:', uploadError); return null; }
 
   const { data, error } = await supabase
     .from('attachments')
@@ -71,4 +79,33 @@ export async function getAttachmentUrl(storagePath: string): Promise<string | nu
 
 export function isImageType(fileType: string): boolean {
   return fileType.startsWith('image/');
+}
+
+export function isPdfType(fileType: string): boolean {
+  return fileType === 'application/pdf';
+}
+
+// Text-like files whose content is worth reading directly rather than
+// treating as an opaque download.
+export function isTextType(fileType: string): boolean {
+  return fileType.startsWith('text/') || fileType === 'application/json';
+}
+
+export async function fetchAttachmentBase64(url: string): Promise<string> {
+  const res = await fetch(url);
+  const blob = await res.blob();
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      resolve(result.slice(result.indexOf(',') + 1));
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
+export async function fetchAttachmentText(url: string): Promise<string> {
+  const res = await fetch(url);
+  return res.text();
 }

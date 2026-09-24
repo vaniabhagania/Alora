@@ -34,7 +34,7 @@ interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
   content: string;
   timestamp?: string;
-  image?: { mimeType: string; data: string };
+  attachments?: { mimeType: string; data: string; name?: string }[];
 }
 
 interface ChatContext {
@@ -91,6 +91,17 @@ const DISTRESS_PATTERNS = [
 
 function detectDistress(message: string): boolean {
   return DISTRESS_PATTERNS.some((p) => p.test(message));
+}
+
+// AskAlora sends a compound prompt: quoted grounding context (a journal
+// entry, a memory...) followed by "\nQuestion: <what they typed>". Scanning
+// the whole thing for distress language means a word from someone else's
+// quoted context — not what they're actually asking right now — could
+// wrongly trip the crisis short-circuit. Mirrors src/lib/ai/provider.ts.
+function extractUserIntent(content: string): string {
+  const marker = '\nQuestion: ';
+  const idx = content.lastIndexOf(marker);
+  return idx === -1 ? content : content.slice(idx + marker.length);
 }
 
 function formatContext(ctx: ChatContext): string {
@@ -150,7 +161,7 @@ Deno.serve(async (req: Request) => {
     }
 
     // ---- Safety gate: never send self-harm/crisis content to the LLM ----
-    if (detectDistress(lastUserMessage.content)) {
+    if (detectDistress(extractUserIntent(lastUserMessage.content))) {
       await supabase.from('activity_events').insert({
         event_type: 'distress_flagged',
         entity_type: 'chat',
@@ -196,8 +207,8 @@ Deno.serve(async (req: Request) => {
       .filter((m) => m.role === 'user' || m.role === 'assistant')
       .map((m) => {
         const parts: Record<string, unknown>[] = [{ text: m.content }];
-        if (m.image) {
-          parts.push({ inlineData: { mimeType: m.image.mimeType, data: m.image.data } });
+        for (const att of m.attachments ?? []) {
+          parts.push({ inlineData: { mimeType: att.mimeType, data: att.data } });
         }
         return { role: m.role === 'assistant' ? 'model' : 'user', parts };
       });

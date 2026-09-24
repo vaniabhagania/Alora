@@ -104,6 +104,7 @@ export function CourseView({ courseId, data, onBack, reload }: Props) {
             weakTopics.length ? `Weak topics: ${weakTopics.map((t) => t.name).join(', ')}` : '',
             courseClasses.length ? `Recent classes: ${courseClasses.slice(0, 5).map((c) => c.title).join(', ')}` : '',
           ].filter(Boolean).join('\n')}
+          attachmentRefs={courseClasses.map((c) => ({ entityType: 'class' as const, entityId: c.id }))}
         />
       </div>
 

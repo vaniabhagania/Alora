@@ -2,7 +2,8 @@ export interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
   content: string;
   timestamp?: string;
-  image?: { mimeType: string; data: string };
+  /** Images and PDFs, sent to Gemini as inline multimodal parts so Alora can actually read them. */
+  attachments?: { mimeType: string; data: string; name?: string }[];
 }
 
 export interface ChatContext {
