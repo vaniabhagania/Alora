@@ -118,8 +118,8 @@ export function NovelPage() {
                     <h3 className="font-display font-semibold text-[var(--text-primary)]">{project.title}</h3>
                     <p className="text-xs text-[var(--text-secondary)]">{projectChapters.length} chapters · {project.themes.length} themes</p>
                   </div>
-                  <button onClick={(e) => { e.stopPropagation(); setEditModal({ type: 'project', data: project }); }} className="rounded-lg p-1.5 text-[var(--text-secondary)] opacity-0 hover:bg-ink/5 hover:text-[var(--text-primary)] group-hover:opacity-100"><Pencil size={16} /></button>
-                  <button onClick={(e) => { e.stopPropagation(); setDeleteTarget({ id: project.id, type: 'project', label: project.title }); }} className="rounded-lg p-1.5 text-[var(--text-secondary)] opacity-0 hover:bg-rose-500/10 hover:text-rose-400 group-hover:opacity-100"><Trash2 size={16} /></button>
+                  <button onClick={(e) => { e.stopPropagation(); setEditModal({ type: 'project', data: project }); }} className="rounded-lg p-1.5 text-[var(--text-secondary)] opacity-100 hover:bg-ink/5 hover:text-[var(--text-primary)] md:opacity-0 md:group-hover:opacity-100"><Pencil size={16} /></button>
+                  <button onClick={(e) => { e.stopPropagation(); setDeleteTarget({ id: project.id, type: 'project', label: project.title }); }} className="rounded-lg p-1.5 text-[var(--text-secondary)] opacity-100 hover:bg-rose-500/10 hover:text-rose-400 md:opacity-0 md:group-hover:opacity-100"><Trash2 size={16} /></button>
                 </div>
 
                 {isExpanded && (
@@ -151,9 +151,9 @@ export function NovelPage() {
                                 <p className="text-sm font-medium text-[var(--text-primary)]">{chapter.title}</p>
                                 <p className="text-xs text-[var(--text-secondary)]">{chapterScenes.length} scenes · {chapter.status}</p>
                               </div>
-                              <button onClick={(e) => { e.stopPropagation(); setCreateModal('scene'); }} className="rounded-lg p-1.5 text-[var(--text-secondary)] opacity-0 hover:bg-ink/5 hover:text-[var(--text-primary)] group-hover:opacity-100"><Plus size={14} /></button>
-                              <button onClick={(e) => { e.stopPropagation(); setEditModal({ type: 'chapter', data: chapter }); }} className="rounded-lg p-1.5 text-[var(--text-secondary)] opacity-0 hover:bg-ink/5 hover:text-[var(--text-primary)] group-hover:opacity-100"><Pencil size={14} /></button>
-                              <button onClick={(e) => { e.stopPropagation(); setDeleteTarget({ id: chapter.id, type: 'chapter', label: chapter.title }); }} className="rounded-lg p-1.5 text-[var(--text-secondary)] opacity-0 hover:bg-rose-500/10 hover:text-rose-400 group-hover:opacity-100"><Trash2 size={14} /></button>
+                              <button onClick={(e) => { e.stopPropagation(); setCreateModal('scene'); }} className="rounded-lg p-1.5 text-[var(--text-secondary)] opacity-100 hover:bg-ink/5 hover:text-[var(--text-primary)] md:opacity-0 md:group-hover:opacity-100"><Plus size={14} /></button>
+                              <button onClick={(e) => { e.stopPropagation(); setEditModal({ type: 'chapter', data: chapter }); }} className="rounded-lg p-1.5 text-[var(--text-secondary)] opacity-100 hover:bg-ink/5 hover:text-[var(--text-primary)] md:opacity-0 md:group-hover:opacity-100"><Pencil size={14} /></button>
+                              <button onClick={(e) => { e.stopPropagation(); setDeleteTarget({ id: chapter.id, type: 'chapter', label: chapter.title }); }} className="rounded-lg p-1.5 text-[var(--text-secondary)] opacity-100 hover:bg-rose-500/10 hover:text-rose-400 md:opacity-0 md:group-hover:opacity-100"><Trash2 size={14} /></button>
                             </div>
                             {chExpanded && (
                               <div className="ml-4 border-l border-ink/8">
@@ -164,7 +164,7 @@ export function NovelPage() {
                                     <div key={scene.id} className="group px-4 py-3">
                                       <div className="flex items-center justify-between">
                                         <p className="text-sm text-[var(--text-primary)]">{scene.title}</p>
-                                        <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100">
+                                        <div className="flex items-center gap-0.5 opacity-100 md:opacity-0 md:group-hover:opacity-100">
                                           <button onClick={() => setEditModal({ type: 'scene', data: scene })} className="rounded-lg p-1 text-[var(--text-secondary)] hover:bg-ink/5 hover:text-[var(--text-primary)]"><Pencil size={12} /></button>
                                           <button onClick={() => setDeleteTarget({ id: scene.id, type: 'scene', label: scene.title })} className="rounded-lg p-1 text-[var(--text-secondary)] hover:bg-rose-500/10 hover:text-rose-400"><Trash2 size={12} /></button>
                                         </div>

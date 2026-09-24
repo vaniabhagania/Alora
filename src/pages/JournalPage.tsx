@@ -146,7 +146,7 @@ export function JournalPage() {
                   )}
                   <span className="rounded-full bg-ink/5 px-2 py-0.5 text-xs capitalize text-[var(--text-secondary)]">{entry.category}</span>
                 </div>
-                <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+                <div className="flex items-center gap-0.5 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100">
                   <button onClick={() => setEditModal(entry)} className="rounded-lg p-1.5 text-[var(--text-secondary)] hover:bg-ink/5 hover:text-[var(--text-primary)]">
                     <Pencil size={16} />
                   </button>

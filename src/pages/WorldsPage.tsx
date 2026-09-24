@@ -186,7 +186,7 @@ export function WorldsPage({ onNavigate }: WorldsPageProps) {
                 </div>
 
                 {/* Hover actions */}
-                <div className="absolute inset-x-0 bottom-0 flex translate-y-full items-center justify-center gap-1 bg-black/60 p-3 backdrop-blur-sm transition-transform group-hover:translate-y-0">
+                <div className="absolute inset-x-0 bottom-0 flex translate-y-0 items-center justify-center gap-1 bg-black/60 p-3 backdrop-blur-sm transition-transform md:translate-y-full md:group-hover:translate-y-0">
                   <button
                     onClick={(e) => { e.stopPropagation(); handleOpen(world); }}
                     className="rounded-lg px-3 py-1.5 text-xs font-medium text-white hover:bg-black/10"

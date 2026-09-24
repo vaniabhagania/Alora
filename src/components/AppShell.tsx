@@ -3,7 +3,7 @@ import { NAV_ITEMS } from '@/lib/nav';
 import { useAuth } from '@/lib/auth';
 import { useWorlds } from '@/lib/worlds';
 import { useSettings } from '@/lib/settingsContext';
-import { LogOut, Sparkles, Globe } from 'lucide-react';
+import { LogOut, Sparkles, Globe, MoreHorizontal, X } from 'lucide-react';
 
 interface AppShellProps {
   currentPage: string;
@@ -16,6 +16,7 @@ export function AppShell({ currentPage, onNavigate, children }: AppShellProps) {
   const { activeWorld } = useWorlds();
   const { hiddenNavItems } = useSettings();
   const [collapsed, setCollapsed] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
 
   const displayName = profile?.display_name || 'there';
   // 'home' and 'settings' always stay visible — a hidden nav item can't leave
@@ -140,15 +141,17 @@ export function AppShell({ currentPage, onNavigate, children }: AppShellProps) {
         </main>
       </div>
 
-      {/* Mobile bottom nav */}
+      {/* Mobile bottom nav — first 4 items get a permanent slot; everything
+          else (including when there are 5 or fewer items total) lives
+          behind "More" so it's always reachable, never silently cut off. */}
       <nav className="fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around border-t border-ink/10 bg-[var(--bg-secondary)]/90 backdrop-blur-xl md:hidden">
-        {visibleNavItems.slice(0, 5).map((item) => {
+        {visibleNavItems.slice(0, 4).map((item) => {
           const Icon = item.icon;
-          const active = currentPage === item.id;
+          const active = currentPage === item.id && !moreOpen;
           return (
             <button
               key={item.id}
-              onClick={() => onNavigate(item.id)}
+              onClick={() => { setMoreOpen(false); onNavigate(item.id); }}
               className={`flex flex-col items-center gap-1 px-2 py-3 transition-colors ${
                 active ? 'text-[var(--accent-secondary)]' : 'text-[var(--text-secondary)]'
               }`}
@@ -158,27 +161,43 @@ export function AppShell({ currentPage, onNavigate, children }: AppShellProps) {
             </button>
           );
         })}
+        {visibleNavItems.length > 4 && (
+          <button
+            onClick={() => setMoreOpen(!moreOpen)}
+            className={`flex flex-col items-center gap-1 px-2 py-3 transition-colors ${
+              moreOpen || visibleNavItems.slice(4).some((i) => i.id === currentPage) ? 'text-[var(--accent-secondary)]' : 'text-[var(--text-secondary)]'
+            }`}
+          >
+            {moreOpen ? <X size={20} /> : <MoreHorizontal size={20} />}
+            <span className="text-[10px] font-medium">More</span>
+          </button>
+        )}
       </nav>
 
-      {/* Mobile "more" nav — accessible via a second row */}
-      <div className="fixed bottom-0 left-0 right-0 z-40 flex items-center justify-around border-t border-ink/8 bg-[var(--bg-secondary)]/95 backdrop-blur-xl md:hidden" style={{ bottom: '56px', display: currentPage === 'more' ? 'flex' : 'none' }}>
-        {visibleNavItems.slice(5).map((item) => {
-          const Icon = item.icon;
-          const active = currentPage === item.id;
-          return (
-            <button
-              key={item.id}
-              onClick={() => onNavigate(item.id)}
-              className={`flex flex-col items-center gap-1 px-2 py-3 transition-colors ${
-                active ? 'text-[var(--accent-secondary)]' : 'text-[var(--text-secondary)]'
-              }`}
-            >
-              <Icon size={20} />
-              <span className="text-[10px] font-medium">{item.label.split(' ')[0]}</span>
-            </button>
-          );
-        })}
-      </div>
+      {/* Mobile "more" sheet */}
+      {moreOpen && (
+        <>
+          <div className="fixed inset-0 z-40 bg-black/40 md:hidden" onClick={() => setMoreOpen(false)} />
+          <div className="fixed bottom-16 left-0 right-0 z-40 grid grid-cols-4 gap-1 border-t border-ink/8 bg-[var(--bg-secondary)]/98 p-3 backdrop-blur-xl md:hidden">
+            {visibleNavItems.slice(4).map((item) => {
+              const Icon = item.icon;
+              const active = currentPage === item.id;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => { setMoreOpen(false); onNavigate(item.id); }}
+                  className={`flex flex-col items-center gap-1 rounded-xl px-2 py-3 transition-colors ${
+                    active ? 'bg-[var(--accent)]/15 text-[var(--accent-secondary)]' : 'text-[var(--text-secondary)] hover:bg-ink/5'
+                  }`}
+                >
+                  <Icon size={20} />
+                  <span className="text-[10px] font-medium">{item.label.split(' ')[0]}</span>
+                </button>
+              );
+            })}
+          </div>
+        </>
+      )}
     </div>
   );
 }

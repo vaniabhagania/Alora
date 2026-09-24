@@ -110,7 +110,7 @@ export function FuturePage() {
                     <div className="h-3 w-3 rounded-md" style={{ background: id.color }} />
                     <h3 className="font-display font-semibold text-[var(--text-primary)]">{id.name}</h3>
                   </div>
-                  <button onClick={() => setDeleteTarget({ id: id.id, tab: 'identities', label: id.name })} className="rounded-lg p-1.5 text-[var(--text-secondary)] opacity-0 hover:bg-rose-500/10 hover:text-rose-400 group-hover:opacity-100"><Trash2 size={16} /></button>
+                  <button onClick={() => setDeleteTarget({ id: id.id, tab: 'identities', label: id.name })} className="rounded-lg p-1.5 text-[var(--text-secondary)] opacity-100 hover:bg-rose-500/10 hover:text-rose-400 md:opacity-0 md:group-hover:opacity-100"><Trash2 size={16} /></button>
                 </div>
                 {id.vision && <p className="mb-3 text-sm text-[var(--text-secondary)]">{id.vision}</p>}
                 <div className="mb-4 flex items-center gap-4">
@@ -145,7 +145,7 @@ export function FuturePage() {
                     <h3 className="font-display font-semibold text-[var(--text-primary)]">{g.title}</h3>
                     {g.description && <p className="mt-1 text-sm text-[var(--text-secondary)]">{g.description}</p>}
                   </div>
-                  <button onClick={() => setDeleteTarget({ id: g.id, tab: 'goals', label: g.title })} className="rounded-lg p-1.5 text-[var(--text-secondary)] opacity-0 hover:bg-rose-500/10 hover:text-rose-400 group-hover:opacity-100"><Trash2 size={16} /></button>
+                  <button onClick={() => setDeleteTarget({ id: g.id, tab: 'goals', label: g.title })} className="rounded-lg p-1.5 text-[var(--text-secondary)] opacity-100 hover:bg-rose-500/10 hover:text-rose-400 md:opacity-0 md:group-hover:opacity-100"><Trash2 size={16} /></button>
                 </div>
                 <div className="mb-2 flex items-center justify-between">
                   <span className="text-xs text-[var(--text-secondary)]">Progress: {g.progress}%</span>
@@ -178,7 +178,7 @@ export function FuturePage() {
                   <p className="text-sm font-medium text-[var(--text-primary)]">{h.name}</p>
                   <p className="text-xs text-[var(--text-secondary)]">{h.frequency} · {h.streak} day streak</p>
                 </div>
-                <button onClick={() => setDeleteTarget({ id: h.id, tab: 'habits', label: h.name })} className="rounded-lg p-1.5 text-[var(--text-secondary)] opacity-0 hover:bg-rose-500/10 hover:text-rose-400 group-hover:opacity-100"><Trash2 size={16} /></button>
+                <button onClick={() => setDeleteTarget({ id: h.id, tab: 'habits', label: h.name })} className="rounded-lg p-1.5 text-[var(--text-secondary)] opacity-100 hover:bg-rose-500/10 hover:text-rose-400 md:opacity-0 md:group-hover:opacity-100"><Trash2 size={16} /></button>
               </div>
             );
           })}
