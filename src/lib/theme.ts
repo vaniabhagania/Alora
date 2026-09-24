@@ -14,8 +14,8 @@ export interface AppTheme {
 
 export const DEFAULT_THEME: AppTheme = {
   name: 'Soft Bloom',
-  bgPrimary: '#faf7f1',
-  bgSecondary: '#f3eee3',
+  bgPrimary: '#e9e4d8',
+  bgSecondary: '#ddd6c6',
   accent: '#9b8ae0',
   accentSecondary: '#f5cf6b',
   textPrimary: '#2e2a3d',
@@ -27,8 +27,8 @@ export const DEFAULT_THEME: AppTheme = {
 export const DEFAULT_WORLD_THEME: WorldThemeSettings = {
   background: {
     type: 'solid',
-    color1: '#faf7f1',
-    color2: '#f3eee3',
+    color1: '#e9e4d8',
+    color2: '#ddd6c6',
     angle: 135,
     imageUrl: null,
     texture: 'none',
