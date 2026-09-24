@@ -121,12 +121,12 @@ export function AnalyzeWorld({ world, elements, onClose, onApply }: AnalyzeWorld
 
   return (
     <div className="world-side-panel" onClick={(e) => e.stopPropagation()}>
-      <div className="sticky top-0 z-10 flex items-center justify-between border-b border-white/5 bg-[var(--bg-secondary)]/95 px-5 py-4 backdrop-blur-xl">
+      <div className="sticky top-0 z-10 flex items-center justify-between border-b border-white/5 bg-black/40 px-5 py-4 backdrop-blur-xl">
         <div className="flex items-center gap-2">
           <Sparkles size={18} className="text-[var(--accent-secondary)]" />
-          <h2 className="font-display text-lg font-semibold text-[var(--text-primary)]">Analyze Your World</h2>
+          <h2 className="font-display text-lg font-semibold text-white">Analyze Your World</h2>
         </div>
-        <button onClick={onClose} className="rounded-lg p-1.5 text-[var(--text-secondary)] hover:bg-white/5">
+        <button onClick={onClose} className="rounded-lg p-1.5 text-white/60 hover:bg-white/5">
           <X size={18} />
         </button>
       </div>
@@ -135,7 +135,7 @@ export function AnalyzeWorld({ world, elements, onClose, onApply }: AnalyzeWorld
         {analyzing && (
           <div className="flex flex-col items-center py-12">
             <div className="mb-4 h-12 w-12 animate-spin-slow rounded-full border-2 border-white/10" style={{ borderTopColor: 'var(--accent)' }} />
-            <p className="text-sm text-[var(--text-secondary)]">Analyzing your world's atmosphere...</p>
+            <p className="text-sm text-white/60">Analyzing your world's atmosphere...</p>
           </div>
         )}
 
@@ -143,10 +143,10 @@ export function AnalyzeWorld({ world, elements, onClose, onApply }: AnalyzeWorld
           <>
             {/* Descriptors */}
             <div>
-              <p className="mb-3 text-sm text-[var(--text-secondary)]">Your world feels like...</p>
+              <p className="mb-3 text-sm text-white/60">Your world feels like...</p>
               <div className="flex flex-wrap gap-2">
                 {descriptors.map((d) => (
-                  <span key={d} className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-sm text-[var(--text-primary)]">
+                  <span key={d} className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-sm text-white">
                     {d}
                   </span>
                 ))}
@@ -155,18 +155,18 @@ export function AnalyzeWorld({ world, elements, onClose, onApply }: AnalyzeWorld
 
             {/* Color palette */}
             <div>
-              <p className="mb-3 text-sm font-medium text-[var(--text-primary)]">Your Palette</p>
+              <p className="mb-3 text-sm font-medium text-white">Your Palette</p>
               <div className="space-y-3">
                 {suggestedColors.map((s) => (
                   <div key={s.key} className="flex items-center gap-3">
                     <div className="h-10 w-10 shrink-0 rounded-lg border border-white/10" style={{ background: editedColors[s.key] || s.color }} />
                     <div className="flex-1">
-                      <p className="text-xs text-[var(--text-secondary)]">{s.label}</p>
+                      <p className="text-xs text-white/60">{s.label}</p>
                       <input
                         type="text"
                         value={editedColors[s.key] || s.color}
                         onChange={(e) => setEditedColors((prev) => ({ ...prev, [s.key]: e.target.value }))}
-                        className="w-full rounded-lg border border-white/10 bg-white/[0.03] px-2 py-1 text-xs text-[var(--text-primary)]"
+                        className="w-full rounded-lg border border-white/10 bg-white/[0.03] px-2 py-1 text-xs text-white"
                       />
                     </div>
                     <input
@@ -180,7 +180,7 @@ export function AnalyzeWorld({ world, elements, onClose, onApply }: AnalyzeWorld
               </div>
             </div>
 
-            <p className="text-xs text-[var(--text-secondary)]">These are suggestions. Edit any color before applying. You remain the art director.</p>
+            <p className="text-xs text-white/60">These are suggestions. Edit any color before applying. You remain the art director.</p>
 
             <button onClick={applyAtmosphere} className="btn-primary flex w-full items-center justify-center gap-2 py-3 text-sm">
               <Check size={16} /> Apply Atmosphere to ALORA

@@ -45,6 +45,13 @@ class LocalAIProvider implements AIProvider {
       return generateEmotionalResponse(emotions, context);
     }
 
+    // Order matters: more specific intents are checked before broader ones,
+    // so e.g. "how am I doing with my tasks" hits the task branch, not the
+    // generic progress branch just because it contains "how am i doing".
+    if (/\b(task|tasks|assignment|assignments|deadline|deadlines|due|overdue|avoiding|procrastinat)\b/.test(msg)) {
+      return generateTaskResponse(context);
+    }
+
     if (/\b(study|revise|review|practice)\b/.test(msg) && /\b(what|should|today|now)\b/.test(msg)) {
       return generateStudyRecommendation(context);
     }
@@ -53,16 +60,12 @@ class LocalAIProvider implements AIProvider {
       return generateWeaknessResponse(context);
     }
 
-    if (/\b(progress|how am i|on track|doing)\b/.test(msg)) {
-      return generateProgressResponse(context);
-    }
-
-    if (/\b(assignment|deadline|due|overdue|avoiding|procrastinat)\b/.test(msg)) {
-      return generateTaskResponse(context);
-    }
-
     if (/\b(learned|last week|last month|remember|recap)\b/.test(msg)) {
       return generateRecapResponse(context);
+    }
+
+    if (/\b(progress|on track)\b/.test(msg) || /how (am i|'?s it) (doing|going|progressing)\b/.test(msg)) {
+      return generateProgressResponse(context);
     }
 
     return generateDefaultResponse(lastUserMessage.content, context);

@@ -73,7 +73,7 @@ export function WorldsPage({ onNavigate }: WorldsPageProps) {
       <div className="mb-8 flex justify-center">
         <button
           onClick={() => setCreateModal(true)}
-          className="group flex items-center gap-2.5 rounded-full border border-white/10 bg-white/[0.03] px-6 py-3 text-sm font-medium text-[var(--text-primary)] transition-all hover:border-[var(--accent)]/30 hover:bg-[var(--accent)]/10"
+          className="group flex items-center gap-2.5 rounded-full border border-black/10 bg-black/[0.03] px-6 py-3 text-sm font-medium text-[var(--text-primary)] transition-all hover:border-[var(--accent)]/30 hover:bg-[var(--accent)]/10"
         >
           <div className="flex h-6 w-6 items-center justify-center rounded-full" style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent-secondary))' }}>
             <Plus size={14} className="text-white" />
@@ -84,7 +84,7 @@ export function WorldsPage({ onNavigate }: WorldsPageProps) {
 
       {worlds.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-center">
-          <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-3xl border border-white/5 bg-white/[0.02]">
+          <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-3xl border border-black/8 bg-black/[0.02]">
             <Globe size={36} className="text-[var(--text-secondary)]" />
           </div>
           <h3 className="mb-2 font-display text-xl font-semibold text-[var(--text-primary)]">No worlds yet</h3>
@@ -173,25 +173,25 @@ export function WorldsPage({ onNavigate }: WorldsPageProps) {
                 <div className="absolute inset-x-0 bottom-0 flex translate-y-full items-center justify-center gap-1 bg-black/60 p-3 backdrop-blur-sm transition-transform group-hover:translate-y-0">
                   <button
                     onClick={(e) => { e.stopPropagation(); handleOpen(world); }}
-                    className="rounded-lg px-3 py-1.5 text-xs font-medium text-white hover:bg-white/10"
+                    className="rounded-lg px-3 py-1.5 text-xs font-medium text-white hover:bg-black/10"
                   >
                     Open
                   </button>
                   <button
                     onClick={(e) => { e.stopPropagation(); handleActivate(world); }}
-                    className="rounded-lg px-3 py-1.5 text-xs font-medium text-white hover:bg-white/10"
+                    className="rounded-lg px-3 py-1.5 text-xs font-medium text-white hover:bg-black/10"
                   >
                     Activate
                   </button>
                   <button
                     onClick={(e) => { e.stopPropagation(); setEditModal(world); }}
-                    className="rounded-lg p-1.5 text-white hover:bg-white/10"
+                    className="rounded-lg p-1.5 text-white hover:bg-black/10"
                   >
                     <Edit2 size={14} />
                   </button>
                   <button
                     onClick={(e) => { e.stopPropagation(); handleDuplicate(world); }}
-                    className="rounded-lg p-1.5 text-white hover:bg-white/10"
+                    className="rounded-lg p-1.5 text-white hover:bg-black/10"
                   >
                     <Copy size={14} />
                   </button>
@@ -269,7 +269,7 @@ function CreateWorldModal({ onClose, onCreated }: { onClose: () => void; onCreat
             onChange={(e) => setName(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter' && name.trim()) onCreated(name.trim(), desc.trim()); }}
             placeholder="e.g. September, Rainy Nights, Main Character Era"
-            className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50"
+            className="w-full rounded-xl border border-black/10 bg-black/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50"
             autoFocus
           />
         </div>
@@ -280,11 +280,11 @@ function CreateWorldModal({ onClose, onCreated }: { onClose: () => void; onCreat
             onChange={(e) => setDesc(e.target.value)}
             placeholder="e.g. Rain, poetry, late-night studying and becoming someone new."
             rows={2}
-            className="w-full resize-none rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50"
+            className="w-full resize-none rounded-xl border border-black/10 bg-black/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50"
           />
         </div>
         <div className="flex justify-end gap-3">
-          <button onClick={onClose} className="rounded-xl px-4 py-2 text-sm font-medium text-[var(--text-secondary)] hover:bg-white/5">Cancel</button>
+          <button onClick={onClose} className="rounded-xl px-4 py-2 text-sm font-medium text-[var(--text-secondary)] hover:bg-black/5">Cancel</button>
           <button
             onClick={() => name.trim() && onCreated(name.trim(), desc.trim())}
             disabled={!name.trim()}
@@ -311,7 +311,7 @@ function EditWorldModal({ world, onClose, onSaved }: { world: World; onClose: ()
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] focus:border-[var(--accent)]/50"
+            className="w-full rounded-xl border border-black/10 bg-black/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] focus:border-[var(--accent)]/50"
             autoFocus
           />
         </div>
@@ -321,11 +321,11 @@ function EditWorldModal({ world, onClose, onSaved }: { world: World; onClose: ()
             value={desc}
             onChange={(e) => setDesc(e.target.value)}
             rows={2}
-            className="w-full resize-none rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] focus:border-[var(--accent)]/50"
+            className="w-full resize-none rounded-xl border border-black/10 bg-black/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] focus:border-[var(--accent)]/50"
           />
         </div>
         <div className="flex justify-end gap-3">
-          <button onClick={onClose} className="rounded-xl px-4 py-2 text-sm font-medium text-[var(--text-secondary)] hover:bg-white/5">Cancel</button>
+          <button onClick={onClose} className="rounded-xl px-4 py-2 text-sm font-medium text-[var(--text-secondary)] hover:bg-black/5">Cancel</button>
           <button onClick={() => onSaved(name.trim(), desc.trim())} className="btn-primary px-5 py-2 text-sm">Save</button>
         </div>
       </div>

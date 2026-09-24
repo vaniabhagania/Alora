@@ -1,18 +1,24 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&family=Poppins:wght@500;600;700;800&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  --bg-primary: #0a0a0f;
-  --bg-secondary: #12121a;
-  --accent: #6366f1;
-  --accent-secondary: #a78bfa;
-  --text-primary: #f4f4f5;
-  --text-secondary: #a1a1aa;
-  --card-bg: rgba(255,255,255,0.04);
-  --glow: rgba(99,102,241,0.15);
+  --bg-primary: #faf7f1;
+  --bg-secondary: #f3eee3;
+  --accent: #9b8ae0;
+  --accent-secondary: #f5cf6b;
+  --text-primary: #2e2a3d;
+  --text-secondary: #746f85;
+  --card-bg: rgba(46,42,61,0.035);
+  --glow: rgba(155,138,224,0.18);
+  --border-color: rgba(46,42,61,0.10);
+  --border-color-hover: rgba(46,42,61,0.18);
+  --scrollbar-thumb: rgba(46,42,61,0.15);
+  --scrollbar-thumb-hover: rgba(46,42,61,0.25);
+  --skeleton-a: rgba(46,42,61,0.05);
+  --skeleton-b: rgba(46,42,61,0.10);
 }
 
 * {
@@ -26,14 +32,16 @@ html, body, #root {
 }
 
 body {
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: 'Nunito', system-ui, sans-serif;
+  font-weight: 500;
   background: var(--bg-primary);
   color: var(--text-primary);
   overflow-x: hidden;
 }
 
 .font-display {
-  font-family: 'Space Grotesk', 'Inter', sans-serif;
+  font-family: 'Poppins', 'Nunito', sans-serif;
+  font-weight: 700;
 }
 
 /* Ambient background */
@@ -91,20 +99,20 @@ body {
   background: var(--card-bg);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255,255,255,0.06);
+  border: 1px solid var(--border-color);
   border-radius: 1rem;
   transition: border-color 0.3s, transform 0.3s;
 }
 
 .glass-card:hover {
-  border-color: rgba(255,255,255,0.12);
+  border-color: var(--border-color-hover);
 }
 
 .glass-card-flat {
   background: var(--card-bg);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255,255,255,0.05);
+  border: 1px solid var(--border-color);
   border-radius: 0.75rem;
 }
 
@@ -117,11 +125,11 @@ body {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(255,255,255,0.1);
+  background: var(--scrollbar-thumb);
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255,255,255,0.2);
+  background: var(--scrollbar-thumb-hover);
 }
 
 /* Animations */
@@ -157,7 +165,7 @@ body {
 
 /* Skeleton */
 .skeleton {
-  background: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.04) 75%);
+  background: linear-gradient(90deg, var(--skeleton-a) 25%, var(--skeleton-b) 50%, var(--skeleton-a) 75%);
   background-size: 200% 100%;
   animation: shimmer 1.5s infinite;
   border-radius: 0.5rem;
@@ -198,8 +206,8 @@ input:focus, textarea:focus, select:focus {
 /* Button base */
 .btn-primary {
   background: linear-gradient(135deg, var(--accent), var(--accent-secondary));
-  color: white;
-  font-weight: 500;
+  color: var(--text-primary);
+  font-weight: 700;
   border-radius: 0.75rem;
   transition: transform 0.2s, box-shadow 0.2s;
 }

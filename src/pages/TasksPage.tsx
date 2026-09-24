@@ -100,12 +100,12 @@ export function TasksPage() {
             key={v.id}
             onClick={() => setView(v.id)}
             className={`flex shrink-0 items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition-colors ${
-              view === v.id ? 'bg-[var(--accent)]/15 text-[var(--text-primary)]' : 'text-[var(--text-secondary)] hover:bg-white/5'
+              view === v.id ? 'bg-[var(--accent)]/15 text-[var(--text-primary)]' : 'text-[var(--text-secondary)] hover:bg-black/5'
             }`}
           >
             {v.label}
             {v.count > 0 && (
-              <span className={`rounded-full px-1.5 py-0.5 text-xs ${v.id === 'overdue' ? 'bg-rose-500/20 text-rose-400' : 'bg-white/10 text-[var(--text-secondary)]'}`}>
+              <span className={`rounded-full px-1.5 py-0.5 text-xs ${v.id === 'overdue' ? 'bg-rose-500/20 text-rose-400' : 'bg-black/10 text-[var(--text-secondary)]'}`}>
                 {v.count}
               </span>
             )}
@@ -205,16 +205,16 @@ function CreateTaskModal({ onClose, onCreated }: { onClose: () => void; onCreate
       <div className="space-y-4">
         <div>
           <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Title</label>
-          <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="What needs to be done?" className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50" />
+          <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="What needs to be done?" className="w-full rounded-xl border border-black/10 bg-black/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50" />
         </div>
         <div>
           <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Description</label>
-          <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Optional details..." rows={2} className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50" />
+          <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Optional details..." rows={2} className="w-full rounded-xl border border-black/10 bg-black/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50" />
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Priority</label>
-            <select value={priority} onChange={(e) => setPriority(e.target.value)} className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] focus:border-[var(--accent)]/50">
+            <select value={priority} onChange={(e) => setPriority(e.target.value)} className="w-full rounded-xl border border-black/10 bg-black/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] focus:border-[var(--accent)]/50">
               <option value="low">Low</option>
               <option value="medium">Medium</option>
               <option value="high">High</option>
@@ -223,7 +223,7 @@ function CreateTaskModal({ onClose, onCreated }: { onClose: () => void; onCreate
           </div>
           <div>
             <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Category</label>
-            <select value={category} onChange={(e) => setCategory(e.target.value)} className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] focus:border-[var(--accent)]/50">
+            <select value={category} onChange={(e) => setCategory(e.target.value)} className="w-full rounded-xl border border-black/10 bg-black/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] focus:border-[var(--accent)]/50">
               <option value="academic">Academic</option>
               <option value="personal">Personal</option>
               <option value="project">Project</option>
@@ -234,15 +234,15 @@ function CreateTaskModal({ onClose, onCreated }: { onClose: () => void; onCreate
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Deadline</label>
-            <input type="datetime-local" value={deadline} onChange={(e) => setDeadline(e.target.value)} className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] focus:border-[var(--accent)]/50" />
+            <input type="datetime-local" value={deadline} onChange={(e) => setDeadline(e.target.value)} className="w-full rounded-xl border border-black/10 bg-black/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] focus:border-[var(--accent)]/50" />
           </div>
           <div>
             <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Estimated Effort</label>
-            <input type="text" value={estimatedEffort} onChange={(e) => setEstimatedEffort(e.target.value)} placeholder="e.g. 2 hours" className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50" />
+            <input type="text" value={estimatedEffort} onChange={(e) => setEstimatedEffort(e.target.value)} placeholder="e.g. 2 hours" className="w-full rounded-xl border border-black/10 bg-black/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50" />
           </div>
         </div>
         <div className="flex justify-end gap-3">
-          <button onClick={onClose} className="rounded-xl px-4 py-2 text-sm font-medium text-[var(--text-secondary)] hover:bg-white/5">Cancel</button>
+          <button onClick={onClose} className="rounded-xl px-4 py-2 text-sm font-medium text-[var(--text-secondary)] hover:bg-black/5">Cancel</button>
           <button onClick={handleCreate} disabled={saving} className="btn-primary px-5 py-2 text-sm">{saving ? 'Creating...' : 'Create'}</button>
         </div>
       </div>

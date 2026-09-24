@@ -11,7 +11,7 @@ interface EmptyStateProps {
 export function EmptyState({ icon, title, message, action }: EmptyStateProps) {
   return (
     <div className="empty-state">
-      <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border border-white/5 bg-white/[0.02]">
+      <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border border-black/8 bg-black/[0.02]">
         {icon}
       </div>
       <h3 className="mb-1.5 font-display text-lg font-semibold text-[var(--text-primary)]">{title}</h3>
@@ -38,7 +38,7 @@ export function LoadingSpinner({ size = 24, label }: LoadingSpinnerProps) {
   return (
     <div className="flex flex-col items-center justify-center gap-3 py-8">
       <div
-        className="animate-spin-slow rounded-full border-2 border-white/10"
+        className="animate-spin-slow rounded-full border-2 border-black/10"
         style={{
           width: size,
           height: size,
@@ -59,7 +59,7 @@ interface ProgressBarProps {
 export function ProgressBar({ value, max = 100, className = '' }: ProgressBarProps) {
   const pct = Math.min(100, (value / max) * 100);
   return (
-    <div className={`h-2 w-full overflow-hidden rounded-full bg-white/5 ${className}`}>
+    <div className={`h-2 w-full overflow-hidden rounded-full bg-black/5 ${className}`}>
       <div
         className="h-full rounded-full transition-all duration-700"
         style={{
@@ -89,19 +89,19 @@ export function PopoverMenu({ items }: PopoverMenuProps) {
     <div className="relative">
       <button
         onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
-        className="rounded-lg p-1.5 text-[var(--text-secondary)] transition-colors hover:bg-white/5 hover:text-[var(--text-primary)]"
+        className="rounded-lg p-1.5 text-[var(--text-secondary)] transition-colors hover:bg-black/5 hover:text-[var(--text-primary)]"
       >
         <MoreVertical size={16} />
       </button>
       {open && (
         <>
           <div className="fixed inset-0 z-[150]" onClick={(e) => { e.stopPropagation(); setOpen(false); }} />
-          <div className="absolute right-0 top-full z-[160] mt-1 min-w-[180px] overflow-hidden rounded-xl border border-white/10 bg-[var(--bg-secondary)] shadow-2xl animate-scale-in">
+          <div className="absolute right-0 top-full z-[160] mt-1 min-w-[180px] overflow-hidden rounded-xl border border-black/10 bg-[var(--bg-secondary)] shadow-2xl animate-scale-in">
             {items.map((item, i) => (
               <button
                 key={i}
                 onClick={(e) => { e.stopPropagation(); setOpen(false); item.onClick(); }}
-                className={`flex w-full items-center gap-2.5 px-4 py-2.5 text-sm transition-colors hover:bg-white/5 ${
+                className={`flex w-full items-center gap-2.5 px-4 py-2.5 text-sm transition-colors hover:bg-black/5 ${
                   item.danger ? 'text-rose-400 hover:bg-rose-500/10' : 'text-[var(--text-primary)]'
                 }`}
               >

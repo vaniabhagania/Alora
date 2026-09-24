@@ -77,16 +77,16 @@ export function MemoryPage() {
       <div className="mb-4 flex gap-3">
         <div className="relative flex-1">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-secondary)]" />
-          <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search memories..." className="w-full rounded-xl border border-white/10 bg-white/[0.03] py-2.5 pl-10 pr-4 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50" />
+          <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search memories..." className="w-full rounded-xl border border-black/10 bg-black/[0.03] py-2.5 pl-10 pr-4 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50" />
         </div>
       </div>
 
       <div className="mb-6 flex flex-wrap gap-2">
-        <button onClick={() => setFilterCategory('all')} className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${filterCategory === 'all' ? 'bg-[var(--accent)]/15 text-[var(--text-primary)]' : 'bg-white/5 text-[var(--text-secondary)] hover:bg-white/10'}`}>
+        <button onClick={() => setFilterCategory('all')} className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${filterCategory === 'all' ? 'bg-[var(--accent)]/15 text-[var(--text-primary)]' : 'bg-black/5 text-[var(--text-secondary)] hover:bg-black/10'}`}>
           All ({memories.length})
         </button>
         {CATEGORIES.map((cat) => (
-          <button key={cat} onClick={() => setFilterCategory(cat)} className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${filterCategory === cat ? 'bg-[var(--accent)]/15 text-[var(--text-primary)]' : 'bg-white/5 text-[var(--text-secondary)] hover:bg-white/10'}`}>
+          <button key={cat} onClick={() => setFilterCategory(cat)} className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${filterCategory === cat ? 'bg-[var(--accent)]/15 text-[var(--text-primary)]' : 'bg-black/5 text-[var(--text-secondary)] hover:bg-black/10'}`}>
             {CATEGORY_LABELS[cat]} ({categoryCounts[cat] || 0})
           </button>
         ))}
@@ -109,7 +109,7 @@ export function MemoryPage() {
             <div key={m.id} className="glass-card group p-4 animate-fade-in">
               <div className="mb-2 flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <span className="rounded-full bg-white/5 px-2 py-0.5 text-xs text-[var(--text-secondary)]">{CATEGORY_LABELS[m.category]}</span>
+                  <span className="rounded-full bg-black/5 px-2 py-0.5 text-xs text-[var(--text-secondary)]">{CATEGORY_LABELS[m.category]}</span>
                   <span className="text-xs text-[var(--text-secondary)]">{new Date(m.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
                   {m.source !== 'manual' && <span className="text-xs text-[var(--accent-secondary)]">{m.source}</span>}
                 </div>
@@ -162,18 +162,18 @@ function CreateMemoryModal({ onClose, onCreated }: { onClose: () => void; onCrea
       <div className="space-y-4">
         <div>
           <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Content</label>
-          <textarea value={content} onChange={(e) => setContent(e.target.value)} placeholder="What do you want ALORA to remember?" rows={4} className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50" />
+          <textarea value={content} onChange={(e) => setContent(e.target.value)} placeholder="What do you want ALORA to remember?" rows={4} className="w-full rounded-xl border border-black/10 bg-black/[0.03] px-4 py-3 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50" />
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Category</label>
-            <select value={category} onChange={(e) => setCategory(e.target.value as MemoryCategory)} className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] focus:border-[var(--accent)]/50">
+            <select value={category} onChange={(e) => setCategory(e.target.value as MemoryCategory)} className="w-full rounded-xl border border-black/10 bg-black/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] focus:border-[var(--accent)]/50">
               {CATEGORIES.map((c) => <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>)}
             </select>
           </div>
           <div>
             <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Importance</label>
-            <select value={importance} onChange={(e) => setImportance(e.target.value)} className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] focus:border-[var(--accent)]/50">
+            <select value={importance} onChange={(e) => setImportance(e.target.value)} className="w-full rounded-xl border border-black/10 bg-black/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] focus:border-[var(--accent)]/50">
               <option value="low">Low</option>
               <option value="normal">Normal</option>
               <option value="high">High</option>
@@ -183,10 +183,10 @@ function CreateMemoryModal({ onClose, onCreated }: { onClose: () => void; onCrea
         </div>
         <div>
           <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Tags (comma-separated)</label>
-          <input type="text" value={tags} onChange={(e) => setTags(e.target.value)} placeholder="statistics, exam, important" className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50" />
+          <input type="text" value={tags} onChange={(e) => setTags(e.target.value)} placeholder="statistics, exam, important" className="w-full rounded-xl border border-black/10 bg-black/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50" />
         </div>
         <div className="flex justify-end gap-3">
-          <button onClick={onClose} className="rounded-xl px-4 py-2 text-sm font-medium text-[var(--text-secondary)] hover:bg-white/5">Cancel</button>
+          <button onClick={onClose} className="rounded-xl px-4 py-2 text-sm font-medium text-[var(--text-secondary)] hover:bg-black/5">Cancel</button>
           <button onClick={handleCreate} disabled={saving} className="btn-primary px-5 py-2 text-sm">{saving ? 'Saving...' : 'Save'}</button>
         </div>
       </div>
