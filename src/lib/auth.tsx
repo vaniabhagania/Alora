@@ -24,12 +24,24 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
  * Supabase surfaces an unreachable/misconfigured backend as a raw
  * "Failed to fetch" network error rather than a real auth failure. Show
  * something a user can act on instead of leaking fetch internals.
+ *
+ * It also has a sharper edge: when its own server times out upstream (a
+ * plain-text "upstream request timeout" 504, not JSON), the supabase-js
+ * client fails to parse that body and falls back to the literal string
+ * "{}" as the AuthRetryableFetchError's message — so without this guard,
+ * users would see a bare "{}" in the error box instead of anything
+ * readable. name === 'AuthRetryableFetchError' (or any 5xx status) is
+ * the library's own signal that this was transient on its end.
  */
-function friendlyAuthError(error: { message: string }): string {
-  if (/failed to fetch/i.test(error.message)) {
+function friendlyAuthError(error: { message?: unknown; status?: number; name?: string }): string {
+  if (error.name === 'AuthRetryableFetchError' || (error.status && error.status >= 500)) {
+    return "The server took a bit too long to respond — this usually clears up on its own. Please wait a moment and try again.";
+  }
+  const message = typeof error.message === 'string' ? error.message : '';
+  if (/failed to fetch/i.test(message)) {
     return "Can't reach the server right now. Check your connection, or if you're the developer, verify the Supabase URL and key in .env.";
   }
-  return error.message;
+  return message || 'Something went wrong. Please try again.';
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
