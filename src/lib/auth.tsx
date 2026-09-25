@@ -69,13 +69,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (data) {
       setProfile(data as AloraProfile);
-    } else {
-      const { data: newProfile } = await supabase
+      return;
+    }
+
+    const { data: newProfile, error: insertError } = await supabase
+      .from('alora_profiles')
+      .insert({ user_id: userId, display_name: '' })
+      .select('*')
+      .maybeSingle();
+
+    if (newProfile) {
+      setProfile(newProfile as AloraProfile);
+      return;
+    }
+
+    // Signing in on another device/tab at nearly the same moment (e.g. the
+    // very first sign-in right after signup) can race this insert against
+    // an identical one from that other session — user_id is UNIQUE, so
+    // whichever loses hits a conflict. Re-select instead of leaving the
+    // profile stuck at null.
+    if (insertError) {
+      const { data: existing } = await supabase
         .from('alora_profiles')
-        .insert({ user_id: userId, display_name: '' })
         .select('*')
+        .eq('user_id', userId)
         .maybeSingle();
-      if (newProfile) setProfile(newProfile as AloraProfile);
+      if (existing) setProfile(existing as AloraProfile);
     }
   }
 
@@ -96,10 +115,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     if (data.user) {
-      await supabase.from('alora_profiles').insert({
+      const { error: insertError } = await supabase.from('alora_profiles').insert({
         user_id: data.user.id,
         display_name: displayName,
       });
+      if (insertError) {
+        // onAuthStateChange's loadProfile() can race this same insert (it
+        // fires as soon as the new session lands) and win, creating a
+        // blank-name profile row first — apply the real display name to it.
+        await supabase
+          .from('alora_profiles')
+          .update({ display_name: displayName })
+          .eq('user_id', data.user.id);
+      }
+      await loadProfile(data.user.id);
     }
     return { error: null, needsEmailConfirmation: false };
   }
