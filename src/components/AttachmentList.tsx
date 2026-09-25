@@ -94,7 +94,11 @@ export function AttachmentList({ entityType, entityId }: Props) {
         <FolderUp size={18} />
         <span className="text-[9px]">{uploading ? `${uploading.done}/${uploading.total}...` : 'Add folder'}</span>
       </button>
-      <input ref={fileInputRef} type="file" multiple className="hidden" onChange={handleFiles} />
+      {/* sr-only, not `hidden` (display:none) — some browsers won't reliably
+          fire a native file picker from a programmatic .click() on a
+          display:none input; the standard visually-hidden-but-present
+          pattern avoids that. */}
+      <input ref={fileInputRef} type="file" multiple className="sr-only" onChange={handleFiles} />
       <input
         ref={folderInputRef}
         type="file"
@@ -102,7 +106,7 @@ export function AttachmentList({ entityType, entityId }: Props) {
         // @ts-expect-error non-standard attributes for folder selection, supported in Chromium/Safari
         webkitdirectory=""
         directory=""
-        className="hidden"
+        className="sr-only"
         onChange={handleFiles}
       />
     </div>

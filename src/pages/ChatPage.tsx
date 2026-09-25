@@ -216,7 +216,7 @@ export function ChatPage() {
           <button onClick={() => fileInputRef.current?.click()} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-ink/10 text-[var(--text-secondary)] hover:bg-ink/5 hover:text-[var(--text-primary)]">
             <ImagePlus size={18} />
           </button>
-          <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageSelect} />
+          <input ref={fileInputRef} type="file" accept="image/*" className="sr-only" onChange={handleImageSelect} />
           <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
