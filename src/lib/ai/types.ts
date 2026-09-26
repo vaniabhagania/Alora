@@ -104,7 +104,7 @@ export function detectEmotionalDistress(message: string): boolean {
     /\b(useless|worthless|hopeless|pointless)\b/i,
     /\b(give up|giving up)\b/i,
     /\b(end it all|end everything)\b/i,
-    /\b(hurt myself|harming myself|self.?harm)\b/i,
+    /\b(hurt(ing|s)? myself|harming myself|self.?harm)\b/i,
     /\b(kill myself|suicide|suicidal)\b/i,
     /\b(nobody cares|no one cares)\b/i,
     /\b(better off (dead|gone|without me))\b/i,
