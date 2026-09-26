@@ -433,10 +433,36 @@ function generateRecapResponse(context: ChatContext): AIChatResponse {
 
 function generateDefaultResponse(userMessage: string, context: ChatContext): AIChatResponse {
   const name = context.userName || 'there';
+  const suggestedActions = ['Ask "What should I study today?"', 'Ask "What am I avoiding?"', 'Ask "How am I progressing?"'];
+  const msg = userMessage.toLowerCase().trim();
+
+  // This branch only runs on the rule-based fallback (the real model is
+  // unreachable), so "hey" and an open-ended knowledge question ("what is
+  // gradient descent?") used to get the identical generic reply below.
+  // Greetings get a short greeting, and real questions get an honest
+  // "I can't reason through that here" instead of a mismatched emotional
+  // prompt that implies something's wrong.
+  if (/^(hey|hi|hello|yo|sup|what'?s up|good (morning|afternoon|evening))\b/.test(msg)) {
+    return {
+      message: `Hey ${name}. I'm on the basic fallback right now (the full model's unreachable), but I'm still here — want to look at today's plan, your tasks, or your weak spots?`,
+      insights: [],
+      suggestedActions,
+    };
+  }
+
+  const looksLikeQuestion = /\?\s*$/.test(userMessage.trim()) || /^(what|why|how|when|where|who|explain|define|can you)\b/.test(msg);
+  if (looksLikeQuestion) {
+    return {
+      message: "I'm on the basic fallback right now, not the full model, so I can't reason through an open-ended question like that yet. I can still work with your actual data though — ask about your tasks, weak topics, or progress instead, and check back shortly for full answers.",
+      insights: [],
+      suggestedActions,
+    };
+  }
+
   return {
     message: `I hear you. Tell me more about what's going on, ${name}. I can help you figure out what to study, review your progress, look at your tasks, or just talk through whatever's on your mind.\n\nWhat do you need right now?`,
     insights: [],
-    suggestedActions: ['Ask "What should I study today?"', 'Ask "What am I avoiding?"', 'Ask "How am I progressing?"'],
+    suggestedActions,
   };
 }
 

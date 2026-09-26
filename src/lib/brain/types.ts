@@ -5,7 +5,8 @@ import type {
 
 export type ContextType =
   | 'daily' | 'academic' | 'planning' | 'chat' | 'goals'
-  | 'journal' | 'creative' | 'personal' | 'quiz' | 'full';
+  | 'journal' | 'creative' | 'personal' | 'quiz' | 'full'
+  | 'home' | 'tasks' | 'memory' | 'novel' | 'course-view';
 
 export type MemoryType = 'explicit' | 'inferred' | 'system_fact';
 export type MemoryStatus = 'active' | 'dismissed' | 'incorrect';

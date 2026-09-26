@@ -228,7 +228,7 @@ Deno.serve(async (req: Request) => {
         body: JSON.stringify({
           contents: geminiContents,
           systemInstruction: { parts: [{ text: systemPrompt }] },
-          generationConfig: { maxOutputTokens: 1024 },
+          generationConfig: { maxOutputTokens: 2048 },
         }),
       },
     );
@@ -250,7 +250,10 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    const assistantText = (candidate?.content?.parts?.[0]?.text as string | undefined)?.trim() || "I'm here. Could you say that another way?";
+    let assistantText = (candidate?.content?.parts?.[0]?.text as string | undefined)?.trim() || "I'm here. Could you say that another way?";
+    if (candidate?.finishReason === 'MAX_TOKENS') {
+      assistantText += "\n\n(That ran long and got cut off — ask me to continue if you want the rest.)";
+    }
 
     // ---- Persist the exchange (unified memory) ----
     let conversationId: string | null = null;

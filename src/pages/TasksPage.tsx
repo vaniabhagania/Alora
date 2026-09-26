@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth';
 import { useToast } from '@/lib/toast';
-import type { Task } from '@/lib/types';
+import type { Task, Priority } from '@/lib/types';
 import { cascadeTaskCompletion, cascadeTaskCreation } from '@/lib/brain/cascade';
 import { Modal, ConfirmModal } from '@/components/Modal';
 import { EmptyState, Skeleton } from '@/components/ui';
@@ -254,7 +254,7 @@ function TaskModal({ task, onClose, onSaved }: { task?: Task; onClose: () => voi
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Priority</label>
-            <select value={priority} onChange={(e) => setPriority(e.target.value)} className="w-full rounded-xl border border-ink/10 bg-ink/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] focus:border-[var(--accent)]/50">
+            <select value={priority} onChange={(e) => setPriority(e.target.value as Priority)} className="w-full rounded-xl border border-ink/10 bg-ink/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] focus:border-[var(--accent)]/50">
               <option value="low">Low</option>
               <option value="medium">Medium</option>
               <option value="high">High</option>

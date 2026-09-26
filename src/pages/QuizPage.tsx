@@ -129,6 +129,7 @@ export function QuizPage() {
 
       await cascadeQuizResults(quizId, questions.map((q, i) => ({
         topic: q.topic,
+        question: q.question,
         is_correct: (answers[i] || '').trim().toLowerCase() === q.correct_answer.trim().toLowerCase() ||
           (q.question_type === 'mcq' && answers[i] === q.correct_answer),
         correct_answer: q.correct_answer,

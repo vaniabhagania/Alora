@@ -6,6 +6,7 @@ import {
   listAttachments, getAttachmentUrl, isImageType, isPdfType, isTextType,
   fetchAttachmentBase64, fetchAttachmentText, type EntityType,
 } from '@/lib/attachments';
+import type { ContextType } from '@/lib/brain/types';
 import { Sparkles, Send, ChevronDown, ChevronUp, Paperclip } from 'lucide-react';
 
 interface AttachmentRef {
@@ -18,8 +19,8 @@ interface Props {
   contextLabel: string;
   /** The actual content to ground the answer in — course summary, entry text, task list, etc. */
   contextText: string;
-  /** Source tag passed through to the unified brain, purely for logging/debugging which surface asked. */
-  source: string;
+  /** Which surface is asking — also scopes how much of the brain's context gets fetched. */
+  source: ContextType;
   /** Entities whose attached files (images, PDFs, text) should be read when answering. */
   attachmentRefs?: AttachmentRef[];
 }
