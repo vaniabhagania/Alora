@@ -8,6 +8,7 @@ import { AuthPage } from '@/pages/AuthPage';
 import { HomePage } from '@/pages/HomePage';
 import { AcademiaPage } from '@/pages/AcademiaPage';
 import { TasksPage } from '@/pages/TasksPage';
+import { RoutinesPage } from '@/pages/RoutinesPage';
 import { QuizPage } from '@/pages/QuizPage';
 import { ChatPage } from '@/pages/ChatPage';
 import { JournalPage } from '@/pages/JournalPage';
@@ -33,6 +34,7 @@ function AppContent() {
     academia: <AcademiaPage />,
     quiz: <QuizPage />,
     tasks: <TasksPage />,
+    routines: <RoutinesPage />,
     chat: <ChatPage />,
     journal: <JournalPage />,
     future: <FuturePage />,
