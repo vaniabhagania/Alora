@@ -64,7 +64,10 @@ async function persistFallbackExchange(messages: ChatMessage[], assistantText: s
 
   await supabase.from('chat_messages').insert([
     { conversation_id: conversationId, role: 'user', content: lastUserMessage.content },
-    { conversation_id: conversationId, role: 'assistant', content: assistantText },
+    // Tagged so System Health can compute a real fallback rate instead of
+    // guessing — a genuine signal for "is the model actually answering,
+    // or is every reply the rule-based backup" rather than a fabricated one.
+    { conversation_id: conversationId, role: 'assistant', content: assistantText, metadata: { source: 'fallback' } },
   ]);
 }
 
