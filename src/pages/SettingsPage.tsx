@@ -23,6 +23,21 @@ export function SettingsPage({ onNavigate }: SettingsPageProps) {
   const [customInstructions, setCustomInstructions] = useState('');
   const [savingInstructions, setSavingInstructions] = useState(false);
 
+  const moodboardAutomationPrefs = (profile?.preferences.moodboardAutomation ?? {}) as { enabled?: boolean; lastGeneratedMonth?: string; lastObsession?: string };
+  const moodboardAutomationEnabled = moodboardAutomationPrefs.enabled !== false;
+  const moodboardAutomationLastRun = moodboardAutomationPrefs.lastGeneratedMonth
+    ? `${moodboardAutomationPrefs.lastGeneratedMonth}${moodboardAutomationPrefs.lastObsession ? ` (${moodboardAutomationPrefs.lastObsession})` : ''}`
+    : null;
+
+  async function toggleMoodboardAutomation(enabled: boolean) {
+    if (!profile) return;
+    await supabase.from('alora_profiles').update({
+      preferences: { ...profile.preferences, moodboardAutomation: { ...moodboardAutomationPrefs, enabled } },
+    }).eq('id', profile.id);
+    await refreshProfile();
+    toast.show(enabled ? 'Monthly moodboard automation enabled.' : 'Monthly moodboard automation disabled.');
+  }
+
   useEffect(() => {
     setDisplayName(profile?.display_name || '');
     setPhase(profile?.current_phase || '');
@@ -131,6 +146,21 @@ export function SettingsPage({ onNavigate }: SettingsPageProps) {
         <button onClick={() => onNavigate('worlds')} className="flex items-center gap-2 rounded-xl border border-ink/10 px-4 py-2 text-sm font-medium text-[var(--text-primary)] transition-colors hover:bg-ink/5">
           Open Vibe <ArrowRight size={16} />
         </button>
+        <div className="mt-4 flex items-center justify-between rounded-xl border border-ink/10 bg-ink/[0.02] p-3">
+          <div>
+            <p className="text-sm text-[var(--text-primary)]">Auto-generate a monthly moodboard</p>
+            <p className="text-xs text-[var(--text-secondary)]">
+              Once a month, ALORA looks at your recent journal and chat for a recurring theme and builds a world around it automatically.
+              {moodboardAutomationLastRun && ` Last run: ${moodboardAutomationLastRun}.`}
+            </p>
+          </div>
+          <button
+            onClick={() => toggleMoodboardAutomation(!moodboardAutomationEnabled)}
+            className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${moodboardAutomationEnabled ? 'bg-[var(--accent)]' : 'bg-ink/10'}`}
+          >
+            <span className={`absolute top-1 h-4 w-4 rounded-full bg-white transition-transform ${moodboardAutomationEnabled ? 'left-6' : 'left-1'}`} />
+          </button>
+        </div>
       </section>
 
       <section className="glass-card mb-4 p-5">
