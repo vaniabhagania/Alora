@@ -1,4 +1,4 @@
-import { Home, GraduationCap, Brain, CheckSquare, MessageSquare, BookOpen, Sparkles, BookA, Database, Settings, Globe, type LucideIcon } from 'lucide-react';
+import { Home, GraduationCap, Brain, CheckSquare, MessageSquare, BookOpen, Sparkles, BookA, Database, Settings, Globe, CalendarClock, type LucideIcon } from 'lucide-react';
 
 export interface NavItem {
   id: string;
@@ -11,6 +11,7 @@ export const NAV_ITEMS: NavItem[] = [
   { id: 'academia', label: 'Academia', icon: GraduationCap },
   { id: 'quiz', label: 'Daily Quiz', icon: Brain },
   { id: 'tasks', label: 'Tasks', icon: CheckSquare },
+  { id: 'routines', label: 'Routines', icon: CalendarClock },
   { id: 'chat', label: 'Alora Chat', icon: MessageSquare },
   { id: 'journal', label: 'Journal', icon: BookOpen },
   { id: 'future', label: 'My Future', icon: Sparkles },
