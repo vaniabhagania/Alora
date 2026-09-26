@@ -247,6 +247,16 @@ function getContextFields(contextType: ContextType) {
       return { ...all, topics: false, courses: false, classes: false, quizAttempts: false };
     case 'quiz':
       return { ...all, habits: false, goals: false, identities: false, journal: false, memories: false, events: false, insights: false };
+    case 'home':
+      return { ...all, topics: false, habits: false, journal: false, memories: false, events: false, insights: false };
+    case 'tasks':
+      return { ...all, topics: false, classes: false, quizAttempts: false, identities: false, habits: false, journal: false, memories: false, events: false, insights: false };
+    case 'memory':
+      return { ...all, topics: false, courses: false, classes: false, quizAttempts: false, habits: false, events: false, insights: false };
+    case 'novel':
+      return { ...all, topics: false, quizAttempts: false, habits: false, events: false, insights: false };
+    case 'course-view':
+      return { ...all, habits: false, goals: false, identities: false, journal: false, memories: false };
     case 'full':
       return all;
     default:

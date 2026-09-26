@@ -4,7 +4,7 @@ import type { Topic, Task, Goal } from '@/lib/types';
 
 export async function cascadeQuizResults(
   quizId: string,
-  questions: { topic: string; is_correct: boolean; correct_answer: string; user_answer: string }[],
+  questions: { topic: string; question: string; is_correct: boolean; correct_answer: string; user_answer: string }[],
   courseId: string | null,
 ): Promise<void> {
   const topicNames = [...new Set(questions.map((q) => q.topic).filter(Boolean))];
@@ -26,10 +26,16 @@ export async function cascadeQuizResults(
     if (!topics || topics.length === 0) continue;
 
     for (const topic of topics as Topic[]) {
+      // Record what was actually missed (the question, with the wrong
+      // answer given), not the topic's own name — and de-duplicate only
+      // within this batch. Deduplicating against all-time history meant
+      // the very first failed quiz on a topic recorded it once and every
+      // quiz after that added nothing, freezing "N recorded mistakes" at
+      // a number that told you nothing about what you'd actually missed.
       const newMistakes = topicQuestions
         .filter((q) => !q.is_correct)
-        .map((q) => q.topic)
-        .filter((m) => !topic.mistakes.includes(m));
+        .map((q) => (q.user_answer ? `${q.question} (answered: "${q.user_answer}")` : q.question))
+        .filter((m, i, arr) => arr.indexOf(m) === i);
 
       const updatedMistakes = [...topic.mistakes, ...newMistakes].slice(-20);
       const allCorrect = correct === total;

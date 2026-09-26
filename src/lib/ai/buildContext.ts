@@ -1,6 +1,7 @@
 import { getStudentContext } from '@/lib/brain';
 import type { ChatContext } from './types';
 import type { AloraProfile } from '@/lib/types';
+import type { ContextType } from '@/lib/brain/types';
 
 const EMPTY_CONTEXT: ChatContext = {
   userName: '', recentClasses: [], upcomingTasks: [], overdueTasks: [],
@@ -12,7 +13,7 @@ const EMPTY_CONTEXT: ChatContext = {
  * caller (the Chat page, an inline "Ask Alora" box on any other page) sees
  * the same picture of the user instead of a stripped-down version.
  */
-export async function buildChatContext(profile: AloraProfile | null, source: string): Promise<ChatContext> {
+export async function buildChatContext(profile: AloraProfile | null, source: ContextType): Promise<ChatContext> {
   if (!profile) return EMPTY_CONTEXT;
 
   const ctx = await getStudentContext(source);

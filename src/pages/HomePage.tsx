@@ -2,9 +2,10 @@ import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth';
 import type { Task, ClassSession, Course, QuizAttempt, Goal, Identity } from '@/lib/types';
+import { getStudentContext, generateInsights, saveInsights, dismissInsight, getActiveInsights, type InsightRecord } from '@/lib/brain';
 import { ProgressRing, EmptyState, Skeleton } from '@/components/ui';
 import { AskAlora } from '@/components/AskAlora';
-import { MessageSquare, Calendar, AlertTriangle, Brain, Flame, TrendingUp, Sparkles, ArrowRight, Clock } from 'lucide-react';
+import { MessageSquare, Calendar, AlertTriangle, Brain, Flame, TrendingUp, Sparkles, ArrowRight, Clock, X } from 'lucide-react';
 
 interface HomeProps {
   onNavigate: (page: string) => void;
@@ -19,6 +20,46 @@ export function HomePage({ onNavigate }: HomeProps) {
   const [quizAttempts, setQuizAttempts] = useState<QuizAttempt[]>([]);
   const [goals, setGoals] = useState<Goal[]>([]);
   const [identities, setIdentities] = useState<Identity[]>([]);
+  const [insights, setInsights] = useState<InsightRecord[]>([]);
+
+  // The seven-detector insight engine (avoidance patterns, quiz trends,
+  // stale topics, stalled goals, contradictions, workload conflicts, habit
+  // streaks) existed but nothing ever called it. Regenerating on every
+  // visit would spam duplicate rows (no DB constraint stops that), so this
+  // only regenerates when the newest active insight is more than 6 hours
+  // old, and skips saving any candidate whose title matches one already
+  // active.
+  const refreshInsights = useCallback(async () => {
+    if (!profile) return;
+    const active = await getActiveInsights();
+
+    const freshEnough = active.length > 0 &&
+      Date.now() - new Date(active[0].created_at).getTime() < 6 * 60 * 60 * 1000;
+
+    if (freshEnough) {
+      setInsights(active);
+      return;
+    }
+
+    const ctx = await getStudentContext('full');
+    const candidates = await generateInsights(ctx);
+    const existingTitles = new Set(active.map((i) => i.title));
+    const toSave = candidates.filter((c) => !existingTitles.has(c.title));
+
+    if (toSave.length > 0) {
+      await saveInsights(toSave);
+    }
+    setInsights(await getActiveInsights());
+  }, [profile]);
+
+  useEffect(() => {
+    refreshInsights();
+  }, [refreshInsights]);
+
+  async function handleDismissInsight(id: string) {
+    setInsights((prev) => prev.filter((i) => i.id !== id));
+    await dismissInsight(id);
+  }
 
   const loadData = useCallback(async () => {
     if (!profile) return;
@@ -116,8 +157,28 @@ export function HomePage({ onNavigate }: HomeProps) {
         />
       </div>
 
-      {/* ALORA Insight */}
-      {insight && (
+      {/* ALORA Insight — real insight-engine output when available, the
+          lightweight local heuristic as a fallback for a brand-new account
+          the detectors don't have enough data to say anything about yet. */}
+      {insights.length > 0 ? (
+        <div className="mb-6 space-y-3">
+          {insights.slice(0, 3).map((ins, i) => (
+            <div key={ins.id} className="glass-card flex items-start gap-3 p-4 animate-fade-in" style={{ animationDelay: `${0.1 + i * 0.05}s` }}>
+              <Sparkles
+                size={18}
+                className={`mt-0.5 shrink-0 ${ins.severity === 'warning' ? 'text-rose-400' : ins.severity === 'positive' ? 'text-emerald-400' : 'text-[var(--accent-secondary)]'}`}
+              />
+              <div className="min-w-0 flex-1">
+                <p className="mb-0.5 text-xs font-medium uppercase tracking-wider text-[var(--accent-secondary)]">{ins.title}</p>
+                <p className="text-sm text-[var(--text-primary)]">{ins.description}</p>
+              </div>
+              <button onClick={() => handleDismissInsight(ins.id)} className="shrink-0 rounded-lg p-1 text-[var(--text-secondary)] hover:bg-ink/5">
+                <X size={14} />
+              </button>
+            </div>
+          ))}
+        </div>
+      ) : insight ? (
         <div className="glass-card mb-6 flex items-start gap-3 p-4 animate-fade-in" style={{ animationDelay: '0.1s' }}>
           <Sparkles size={18} className="mt-0.5 shrink-0 text-[var(--accent-secondary)]" />
           <div>
@@ -125,7 +186,7 @@ export function HomePage({ onNavigate }: HomeProps) {
             <p className="text-sm text-[var(--text-primary)]">{insight}</p>
           </div>
         </div>
-      )}
+      ) : null}
 
       {/* Stats grid */}
       <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-4 animate-fade-in" style={{ animationDelay: '0.15s' }}>

@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useAuth } from '@/lib/auth';
 import { useSettings } from '@/lib/settingsContext';
+import { supabase } from '@/lib/supabase';
 import { aiProvider } from '@/lib/ai/provider';
 import type { ChatMessage } from '@/lib/ai/types';
 import { buildChatContext } from '@/lib/ai/buildContext';
@@ -39,14 +40,56 @@ export function ChatPage() {
   // other feature — one brain, one memory.
   const loadContext = useCallback(() => buildChatContext(profile, 'chat'), [profile]);
 
+  // The edge function has been persisting every exchange into
+  // chat_conversations/chat_messages all along — this just reads it back,
+  // once, instead of showing a fresh greeting over a conversation that
+  // already happened. Guarded by a ref (not messages.length) so it can't
+  // re-fire and clobber an in-progress conversation if `profile` updates
+  // for an unrelated reason (e.g. a streak change refreshing it).
+  const historyStartedRef = useRef(false);
+
   useEffect(() => {
-    if (messages.length === 0) {
-      setMessages([{
-        role: 'assistant',
-        content: `Hi ${profile?.display_name || 'there'}. I'm ALORA. I can see your tasks, your classes, your quiz history, your goals, and your future-self identities. Ask me anything — I'll use your actual data, not guesses.`,
-        timestamp: new Date().toISOString(),
-      }]);
-    }
+    if (historyStartedRef.current) return;
+    historyStartedRef.current = true;
+    let cancelled = false;
+
+    (async () => {
+      const { data: convo } = await supabase
+        .from('chat_conversations')
+        .select('id')
+        .order('updated_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      let history: ChatMessage[] = [];
+      if (convo) {
+        const { data: rows } = await supabase
+          .from('chat_messages')
+          .select('role, content, created_at')
+          .eq('conversation_id', convo.id)
+          .order('created_at', { ascending: true });
+        if (rows && rows.length > 0) {
+          history = rows.map((m) => ({
+            role: m.role as ChatMessage['role'],
+            content: m.content as string,
+            timestamp: m.created_at as string,
+          }));
+        }
+      }
+
+      if (cancelled) return;
+      if (history.length > 0) {
+        setMessages(history);
+      } else {
+        setMessages([{
+          role: 'assistant',
+          content: `Hi ${profile?.display_name || 'there'}. I'm ALORA. I can see your tasks, your classes, your quiz history, your goals, and your future-self identities. Ask me anything — I'll use your actual data, not guesses.`,
+          timestamp: new Date().toISOString(),
+        }]);
+      }
+    })();
+
+    return () => { cancelled = true; };
   }, [profile]);
 
   useEffect(() => {

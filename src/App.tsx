@@ -39,7 +39,7 @@ function AppContent() {
     novel: <NovelPage />,
     memory: <MemoryPage />,
     worlds: <WorldsPage onNavigate={setCurrentPage} />,
-    settings: <SettingsPage />,
+    settings: <SettingsPage onNavigate={setCurrentPage} />,
   };
 
   return (

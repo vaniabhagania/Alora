@@ -7,7 +7,11 @@ import { supabase } from '@/lib/supabase';
 import { NAV_ITEMS } from '@/lib/nav';
 import { Globe, User, Bell, Brain, Download, Shield, LogOut, ArrowRight, LayoutGrid, Sun, Moon } from 'lucide-react';
 
-export function SettingsPage() {
+interface SettingsPageProps {
+  onNavigate: (page: string) => void;
+}
+
+export function SettingsPage({ onNavigate }: SettingsPageProps) {
   const { profile, refreshProfile, signOut } = useAuth();
   const { activeWorld, worlds, deactivateWorld } = useWorlds();
   const { hiddenNavItems, toggleNavItem, themeMode, setThemeMode } = useSettings();
@@ -124,7 +128,7 @@ export function SettingsPage() {
         ) : (
           <p className="mb-4 text-xs text-[var(--text-secondary)]">No active world. ALORA is using its default appearance.</p>
         )}
-        <button onClick={() => window.dispatchEvent(new CustomEvent('alora-navigate', { detail: 'worlds' }))} className="flex items-center gap-2 rounded-xl border border-ink/10 px-4 py-2 text-sm font-medium text-[var(--text-primary)] transition-colors hover:bg-ink/5">
+        <button onClick={() => onNavigate('worlds')} className="flex items-center gap-2 rounded-xl border border-ink/10 px-4 py-2 text-sm font-medium text-[var(--text-primary)] transition-colors hover:bg-ink/5">
           Open Vibe <ArrowRight size={16} />
         </button>
       </section>
