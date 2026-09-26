@@ -260,6 +260,8 @@ function getContextFields(contextType: ContextType) {
       return { ...all, topics: false, quizAttempts: false, habits: false, events: false, insights: false };
     case 'course-view':
       return { ...all, habits: false, goals: false, identities: false, journal: false, memories: false };
+    case 'routines':
+      return { ...all, topics: false, classes: false, quizAttempts: false, identities: false, journal: false, memories: false, events: false, insights: false };
     case 'full':
       return all;
     default:
