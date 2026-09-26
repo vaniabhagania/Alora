@@ -1,14 +1,15 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/lib/toast';
 import { aiProvider } from '@/lib/ai/provider';
+import { useSpeechRecognition } from '@/lib/useSpeechRecognition';
 import type { AcademicData } from '@/lib/academic';
 import type { Course, Module, Topic, ClassSession } from '@/lib/types';
 import { Modal } from '@/components/Modal';
 import { EmptyState, PopoverMenu } from '@/components/ui';
 import {
   ChevronRight, ChevronDown, Plus, GraduationCap, FileText, Trash2,
-  Pencil, Archive, ArchiveRestore, ArrowUp, ArrowDown, Sparkles, CheckSquare,
+  Pencil, Archive, ArchiveRestore, ArrowUp, ArrowDown, Sparkles, CheckSquare, Mic, MicOff,
 } from 'lucide-react';
 
 export type Level = 'year' | 'semester' | 'course' | 'module' | 'topic';
@@ -677,8 +678,27 @@ export function LogClassModal({ courses, modules, topics, defaultCourseId, onClo
   const [summarizing, setSummarizing] = useState(false);
   const [suggestedTasks, setSuggestedTasks] = useState<{ title: string; deadline: string; priority: string; category: string }[]>([]);
   const [addingTasks, setAddingTasks] = useState(false);
+  const speech = useSpeechRecognition();
+
+  // Depend on speech.stop specifically (a stable useCallback reference),
+  // not the speech object itself — that's a fresh object every render, so
+  // depending on it would re-run this cleanup (stopping an active
+  // recording) on every keystroke instead of only on unmount.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => () => speech.stop(), [speech.stop]);
 
   const courseTopics = topics.filter((t) => { const mod = modules.find((m) => m.id === t.module_id); return mod?.course_id === selectedCourse; });
+
+  function handleToggleVoiceCapture() {
+    if (speech.isListening) {
+      speech.stop();
+      return;
+    }
+    speech.start(
+      (text) => setRawThoughts((prev) => (prev.trim() ? `${prev.trim()} ${text}` : text)),
+      (message) => toast.show(message, 'error'),
+    );
+  }
 
   async function handleSummarize() {
     if (!rawThoughts.trim()) { toast.show('Write your raw thoughts first.', 'error'); return; }
@@ -759,10 +779,24 @@ export function LogClassModal({ courses, modules, topics, defaultCourseId, onClo
           <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Your raw thoughts</label>
           <textarea value={rawThoughts} onChange={(e) => setRawThoughts(e.target.value)} placeholder="Just talk naturally. What happened? What did you learn? What confused you?" rows={5} className="w-full rounded-xl border border-ink/10 bg-ink/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50" />
           <div className="mt-1.5 flex items-center justify-between">
-            <p className="text-xs text-[var(--text-secondary)]/60">Your original words are preserved forever.</p>
-            <button type="button" onClick={handleSummarize} disabled={summarizing || !rawThoughts.trim()} className="flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium text-[var(--accent-secondary)] hover:bg-[var(--accent)]/10 disabled:opacity-40">
-              <Sparkles size={12} /> {summarizing ? 'Summarizing...' : 'Summarize with AI'}
-            </button>
+            <p className="text-xs text-[var(--text-secondary)]/60">
+              {speech.isListening ? 'Listening... tap the mic again to stop.' : 'Your original words are preserved forever.'}
+            </p>
+            <div className="flex items-center gap-1">
+              {speech.isSupported && (
+                <button
+                  type="button"
+                  onClick={handleToggleVoiceCapture}
+                  title={speech.isListening ? 'Stop voice capture' : 'Capture by speaking'}
+                  className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium hover:bg-[var(--accent)]/10 ${speech.isListening ? 'text-rose-400' : 'text-[var(--accent-secondary)]'}`}
+                >
+                  {speech.isListening ? <MicOff size={12} /> : <Mic size={12} />} {speech.isListening ? 'Stop' : 'Speak'}
+                </button>
+              )}
+              <button type="button" onClick={handleSummarize} disabled={summarizing || !rawThoughts.trim()} className="flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium text-[var(--accent-secondary)] hover:bg-[var(--accent)]/10 disabled:opacity-40">
+                <Sparkles size={12} /> {summarizing ? 'Summarizing...' : 'Summarize with AI'}
+              </button>
+            </div>
           </div>
         </div>
         {suggestedTasks.length > 0 && (
