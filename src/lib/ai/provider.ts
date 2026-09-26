@@ -31,7 +31,11 @@ function extractUserIntent(content: string): string {
   return idx === -1 ? content : content.slice(idx + marker.length);
 }
 
-class LocalAIProvider implements AIProvider {
+// Exported (rather than kept module-private) so the fallback path — one
+// of the money paths a project this size should have tests over — can be
+// exercised directly and deterministically, without mocking the network
+// call RemoteAIProvider makes first.
+export class LocalAIProvider implements AIProvider {
   name = 'local';
 
   async chat(messages: ChatMessage[], context: ChatContext): Promise<AIChatResponse> {

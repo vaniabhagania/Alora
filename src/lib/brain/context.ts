@@ -177,7 +177,10 @@ export async function getStudentContext(
   };
 }
 
-function computeWeakTopics(
+// Exported so this — one of the money paths a project this size should
+// have tests over — can be tested directly without going through
+// getStudentContext's live Supabase queries.
+export function computeWeakTopics(
   topics: Topic[],
   quizAttempts: QuizAttempt[],
 ): { name: string; confidence: number; reasons: string[] }[] {

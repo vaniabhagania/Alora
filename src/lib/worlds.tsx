@@ -1,8 +1,9 @@
-import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, useCallback, useRef, type ReactNode } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth';
 import { useSettings } from '@/lib/settingsContext';
 import { applyWorldTheme, applyTheme, DEFAULT_THEME, DEFAULT_DARK_THEME, DEFAULT_WORLD_THEME } from '@/lib/theme';
+import { maybeRunMonthlyMoodboardAutomation } from '@/lib/moodboardAutomation';
 import type { World, WorldThemeSettings } from '@/lib/types';
 
 interface WorldContextValue {
@@ -22,11 +23,12 @@ interface WorldContextValue {
 const WorldContext = createContext<WorldContextValue | undefined>(undefined);
 
 export function WorldProvider({ children }: { children: ReactNode }) {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const { themeMode } = useSettings();
   const [worlds, setWorlds] = useState<World[]>([]);
   const [activeWorld, setActiveWorld] = useState<World | null>(null);
   const [loading, setLoading] = useState(true);
+  const moodboardAutomationStartedRef = useRef(false);
 
   const refresh = useCallback(async () => {
     if (!user) {
@@ -49,6 +51,19 @@ export function WorldProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     refresh();
   }, [refresh]);
+
+  // At most once per mount (the ref guard, not a dependency on profile
+  // itself, since profile's reference can change for unrelated reasons
+  // like a streak update): check whether a new month has started and, if
+  // so, generate this month's obsession-driven world and refresh so the
+  // change shows up immediately.
+  useEffect(() => {
+    if (!profile || moodboardAutomationStartedRef.current) return;
+    moodboardAutomationStartedRef.current = true;
+    maybeRunMonthlyMoodboardAutomation(profile).then(({ ran }) => {
+      if (ran) refresh();
+    });
+  }, [profile, refresh]);
 
   useEffect(() => {
     if (activeWorld) {
