@@ -151,7 +151,17 @@ Deno.serve(async (req: Request) => {
       return json({ error: 'Not authenticated' }, 401);
     }
 
-    const body = await req.json() as { messages: ChatMessage[]; context: ChatContext };
+    const body = await req.json() as { messages: ChatMessage[]; context: ChatContext; healthCheck?: boolean };
+
+    // A dedicated no-op branch for the System Health check — confirms the
+    // function is deployed, reachable, and authenticated, and reports
+    // whether GEMINI_API_KEY is set, without spending a Gemini call or
+    // writing anything into the user's actual chat history the way
+    // sending a real "ping" chat message would.
+    if (body.healthCheck) {
+      return json({ healthCheck: true, geminiKeyConfigured: !!Deno.env.get('GEMINI_API_KEY') });
+    }
+
     const messages = body.messages ?? [];
     const context = body.context;
     const lastUserMessage = [...messages].reverse().find((m) => m.role === 'user');

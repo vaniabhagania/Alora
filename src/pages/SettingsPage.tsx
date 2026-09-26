@@ -5,7 +5,8 @@ import { useWorlds } from '@/lib/worlds';
 import { useSettings } from '@/lib/settingsContext';
 import { supabase } from '@/lib/supabase';
 import { NAV_ITEMS } from '@/lib/nav';
-import { Globe, User, Bell, Brain, Download, Shield, LogOut, ArrowRight, LayoutGrid, Sun, Moon } from 'lucide-react';
+import { runSystemHealthCheck, type SystemHealthReport } from '@/lib/systemHealth';
+import { Globe, User, Bell, Brain, Download, Shield, LogOut, ArrowRight, LayoutGrid, Sun, Moon, Activity, CheckCircle2, XCircle, AlertTriangle } from 'lucide-react';
 
 interface SettingsPageProps {
   onNavigate: (page: string) => void;
@@ -22,6 +23,8 @@ export function SettingsPage({ onNavigate }: SettingsPageProps) {
   const [saving, setSaving] = useState(false);
   const [customInstructions, setCustomInstructions] = useState('');
   const [savingInstructions, setSavingInstructions] = useState(false);
+  const [healthReport, setHealthReport] = useState<SystemHealthReport | null>(null);
+  const [checkingHealth, setCheckingHealth] = useState(false);
 
   const moodboardAutomationPrefs = (profile?.preferences.moodboardAutomation ?? {}) as { enabled?: boolean; lastGeneratedMonth?: string; lastObsession?: string };
   const moodboardAutomationEnabled = moodboardAutomationPrefs.enabled !== false;
@@ -65,6 +68,13 @@ export function SettingsPage({ onNavigate }: SettingsPageProps) {
     setSaving(false);
     if (error) toast.show('Failed to save profile.', 'error');
     else { toast.show('Profile saved.'); refreshProfile(); }
+  }
+
+  async function runHealthCheck() {
+    setCheckingHealth(true);
+    const report = await runSystemHealthCheck();
+    setHealthReport(report);
+    setCheckingHealth(false);
   }
 
   async function exportData() {
@@ -218,6 +228,58 @@ export function SettingsPage({ onNavigate }: SettingsPageProps) {
         <div className="mb-4 flex items-center gap-3"><Shield size={18} className="text-[var(--accent-secondary)]" /><h2 className="font-display font-semibold text-[var(--text-primary)]">Your Data</h2></div>
         <p className="mb-4 text-sm text-[var(--text-secondary)]">Your data belongs to you. Export a complete copy at any time.</p>
         <button onClick={exportData} className="flex items-center gap-2 rounded-xl border border-ink/10 px-4 py-2 text-sm font-medium text-[var(--text-primary)] hover:bg-ink/5"><Download size={16} /> Export All Data</button>
+      </section>
+
+      <section className="glass-card mb-4 p-5">
+        <div className="mb-4 flex items-center gap-3"><Activity size={18} className="text-[var(--accent-secondary)]" /><h2 className="font-display font-semibold text-[var(--text-primary)]">System Health</h2></div>
+        <p className="mb-4 text-sm text-[var(--text-secondary)]">
+          Checks real things, not code: whether the AI backend is actually reachable and configured, whether recent database migrations were applied, and how often chat has had to fall back to the basic rule-based reply. Run it whenever something feels off.
+        </p>
+        <button onClick={runHealthCheck} disabled={checkingHealth} className="btn-primary px-4 py-2 text-sm">
+          {checkingHealth ? 'Checking...' : 'Run Health Check'}
+        </button>
+
+        {healthReport && (
+          <div className="mt-4 space-y-3">
+            <div className={`flex items-center gap-2 rounded-xl border p-3 text-sm font-medium ${
+              healthReport.overall === 'healthy' ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-400'
+              : healthReport.overall === 'degraded' ? 'border-orange-500/20 bg-orange-500/10 text-orange-400'
+              : 'border-rose-500/20 bg-rose-500/10 text-rose-400'
+            }`}>
+              {healthReport.overall === 'healthy' ? <CheckCircle2 size={16} /> : healthReport.overall === 'degraded' ? <AlertTriangle size={16} /> : <XCircle size={16} />}
+              Overall: {healthReport.overall} — checked {new Date(healthReport.checkedAt).toLocaleTimeString()}
+            </div>
+
+            <div className="rounded-xl border border-ink/10 bg-ink/[0.02] p-3">
+              <div className="mb-1 flex items-center gap-2 text-sm text-[var(--text-primary)]">
+                {healthReport.edgeFunction.status === 'healthy' ? <CheckCircle2 size={14} className="text-emerald-400" /> : healthReport.edgeFunction.status === 'misconfigured' ? <AlertTriangle size={14} className="text-orange-400" /> : <XCircle size={14} className="text-rose-400" />}
+                Alora Chat function — {healthReport.edgeFunction.status} ({healthReport.edgeFunction.latencyMs}ms)
+              </div>
+              <p className="text-xs text-[var(--text-secondary)]">{healthReport.edgeFunction.detail}</p>
+            </div>
+
+            <div className="rounded-xl border border-ink/10 bg-ink/[0.02] p-3">
+              <p className="mb-2 text-sm text-[var(--text-primary)]">Database migrations</p>
+              <div className="space-y-1">
+                {healthReport.migrations.map((m) => (
+                  <div key={m.label} className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">
+                    {m.ok ? <CheckCircle2 size={12} className="text-emerald-400" /> : <XCircle size={12} className="text-rose-400" />}
+                    {m.label}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-ink/10 bg-ink/[0.02] p-3">
+              <p className="text-sm text-[var(--text-primary)]">Fallback rate (last 7 days)</p>
+              <p className="text-xs text-[var(--text-secondary)]">
+                {healthReport.fallbackRate.totalReplies === 0
+                  ? 'No chat replies in this window yet.'
+                  : `${healthReport.fallbackRate.fallbackReplies} of ${healthReport.fallbackRate.totalReplies} replies (${Math.round(healthReport.fallbackRate.rate * 100)}%) used the local fallback instead of the real model.`}
+              </p>
+            </div>
+          </div>
+        )}
       </section>
 
       <button onClick={signOut} className="flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium text-rose-400 hover:bg-rose-500/10"><LogOut size={16} /> Sign Out</button>
