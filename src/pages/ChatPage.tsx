@@ -7,7 +7,8 @@ import type { ChatMessage } from '@/lib/ai/types';
 import { buildChatContext } from '@/lib/ai/buildContext';
 import { detectNavIntent, type NavIntent } from '@/lib/nav';
 import { useToast } from '@/lib/toast';
-import { Send, Sparkles, LayoutGrid, X, Paperclip, FileText } from 'lucide-react';
+import { useSpeechRecognition } from '@/lib/useSpeechRecognition';
+import { Send, Sparkles, LayoutGrid, X, Paperclip, FileText, Mic, MicOff } from 'lucide-react';
 
 const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
 const MAX_PDF_BYTES = 15 * 1024 * 1024;
@@ -35,6 +36,18 @@ export function ChatPage() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const toast = useToast();
+  const speech = useSpeechRecognition();
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- see the identical comment in AcademiaHierarchy.tsx's LogClassModal
+  useEffect(() => () => speech.stop(), [speech.stop]);
+
+  function handleToggleVoiceCapture() {
+    if (speech.isListening) { speech.stop(); return; }
+    speech.start(
+      (text) => setInput((prev) => (prev.trim() ? `${prev.trim()} ${text}` : text)),
+      (message) => toast.show(message, 'error'),
+    );
+  }
 
   // Sourced from the unified brain (src/lib/brain) rather than ad hoc
   // queries, so chat sees exactly the same picture of the user as every
@@ -286,15 +299,27 @@ export function ChatPage() {
             <Paperclip size={18} />
           </button>
           <input ref={fileInputRef} type="file" accept="image/*,application/pdf" className="sr-only" onChange={handleFileSelect} />
-          <textarea
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
-            placeholder="Ask Alora anything..."
-            rows={1}
-            className="flex-1 resize-none rounded-xl border border-ink/10 bg-ink/[0.03] px-4 py-3 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50"
-            style={{ maxHeight: '120px' }}
-          />
+          {speech.isSupported && (
+            <button
+              onClick={handleToggleVoiceCapture}
+              title={speech.isListening ? 'Stop voice capture' : 'Speak your message'}
+              className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border ${speech.isListening ? 'border-rose-500/30 text-rose-400' : 'border-ink/10 text-[var(--text-secondary)] hover:bg-ink/5 hover:text-[var(--text-primary)]'}`}
+            >
+              {speech.isListening ? <MicOff size={18} /> : <Mic size={18} />}
+            </button>
+          )}
+          <div className="flex-1">
+            <textarea
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
+              placeholder="Ask Alora anything..."
+              rows={1}
+              className="w-full resize-none rounded-xl border border-ink/10 bg-ink/[0.03] px-4 py-3 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50"
+              style={{ maxHeight: '120px' }}
+            />
+            {speech.isListening && <p className="mt-1 text-xs text-[var(--text-secondary)]">Listening... tap the mic again to stop.</p>}
+          </div>
           <button onClick={handleSend} disabled={(!input.trim() && !attachedFile) || thinking} className="btn-primary flex h-11 w-11 shrink-0 items-center justify-center">
             <Send size={18} />
           </button>
