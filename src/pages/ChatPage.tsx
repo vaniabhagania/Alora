@@ -12,6 +12,7 @@ import { Send, Sparkles, LayoutGrid, X, Paperclip, FileText, Mic, MicOff } from 
 
 const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
 const MAX_PDF_BYTES = 15 * 1024 * 1024;
+const MAX_GENERIC_BYTES = 20 * 1024 * 1024;
 
 function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -32,7 +33,7 @@ export function ChatPage() {
   const [input, setInput] = useState('');
   const [thinking, setThinking] = useState(false);
   const [navSuggestion, setNavSuggestion] = useState<NavIntent | null>(null);
-  const [attachedFile, setAttachedFile] = useState<{ previewUrl: string | null; mimeType: string; base64: string; name: string } | null>(null);
+  const [attachedFile, setAttachedFile] = useState<{ previewUrl: string | null; mimeType: string; base64: string; name: string; readable: boolean } | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const toast = useToast();
@@ -117,29 +118,37 @@ export function ChatPage() {
     e.target.value = '';
     if (!file) return;
 
+    // Any file can be attached — but Gemini's inlineData only actually
+    // reads images and PDFs. Anything else (zip, docx, pptx, code
+    // archives...) still attaches so the file's name travels with the
+    // message, it's just not readable content: no point base64-encoding
+    // and shipping bytes the model can't use, so we skip that entirely
+    // and tell Alora (and the user) plainly what happened instead of
+    // silently pretending it was read.
     const isImage = file.type.startsWith('image/');
     const isPdf = file.type === 'application/pdf';
-    if (!isImage && !isPdf) {
-      toast.show("Alora can read images and PDFs here. For PowerPoint or Word docs, export to PDF first — raw .pptx/.docx aren't something the model can read directly.", 'error');
-      return;
-    }
-    const maxBytes = isImage ? MAX_IMAGE_BYTES : MAX_PDF_BYTES;
+    const readable = isImage || isPdf;
+
+    const maxBytes = isImage ? MAX_IMAGE_BYTES : readable ? MAX_PDF_BYTES : MAX_GENERIC_BYTES;
     if (file.size > maxBytes) {
       toast.show(`File is too large (max ${Math.round(maxBytes / (1024 * 1024))}MB).`, 'error');
       return;
     }
 
-    const base64 = await fileToBase64(file);
-    setAttachedFile({ previewUrl: isImage ? URL.createObjectURL(file) : null, mimeType: file.type, base64, name: file.name });
+    const base64 = readable ? await fileToBase64(file) : '';
+    setAttachedFile({ previewUrl: isImage ? URL.createObjectURL(file) : null, mimeType: file.type || 'application/octet-stream', base64, name: file.name, readable });
   }
 
   async function handleSend() {
     if ((!input.trim() && !attachedFile) || thinking) return;
+    const unreadableNote = attachedFile && !attachedFile.readable
+      ? `[Attached "${attachedFile.name}" — I can't read this file's content directly (only images and PDFs), but wanted you to know it was attached.]`
+      : '';
     const userMsg: ChatMessage = {
       role: 'user',
-      content: input.trim(),
+      content: [input.trim(), unreadableNote].filter(Boolean).join('\n\n'),
       timestamp: new Date().toISOString(),
-      ...(attachedFile ? { attachments: [{ mimeType: attachedFile.mimeType, data: attachedFile.base64, name: attachedFile.name }] } : {}),
+      ...(attachedFile?.readable ? { attachments: [{ mimeType: attachedFile.mimeType, data: attachedFile.base64, name: attachedFile.name }] } : {}),
     };
     setMessages((prev) => [...prev, userMsg]);
     setInput('');
@@ -291,14 +300,18 @@ export function ChatPage() {
                 <X size={12} />
               </button>
             </div>
-            <p className="text-xs text-[var(--text-secondary)]">{attachedFile.previewUrl ? 'Image attached' : 'PDF attached'} — Alora can read this.</p>
+            <p className="text-xs text-[var(--text-secondary)]">
+              {attachedFile.readable
+                ? `${attachedFile.previewUrl ? 'Image' : 'PDF'} attached — Alora can read this.`
+                : "Attached — Alora can't read this file type, but it'll know the name."}
+            </p>
           </div>
         )}
         <div className="mx-auto flex max-w-3xl items-end gap-2">
           <button onClick={() => fileInputRef.current?.click()} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-ink/10 text-[var(--text-secondary)] hover:bg-ink/5 hover:text-[var(--text-primary)]">
             <Paperclip size={18} />
           </button>
-          <input ref={fileInputRef} type="file" accept="image/*,application/pdf" className="sr-only" onChange={handleFileSelect} />
+          <input ref={fileInputRef} type="file" className="sr-only" onChange={handleFileSelect} />
           {speech.isSupported && (
             <button
               onClick={handleToggleVoiceCapture}
