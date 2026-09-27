@@ -3,12 +3,13 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth';
 import { useToast } from '@/lib/toast';
 import { aiProvider } from '@/lib/ai/provider';
+import { useSpeechRecognition } from '@/lib/useSpeechRecognition';
 import type { Memory, MemoryCategory } from '@/lib/types';
 import { Modal, ConfirmModal } from '@/components/Modal';
 import { EmptyState, Skeleton } from '@/components/ui';
 import { AttachmentList } from '@/components/AttachmentList';
 import { AskAlora } from '@/components/AskAlora';
-import { Plus, Database, Trash2, Search, Tag, Pencil } from 'lucide-react';
+import { Plus, Database, Trash2, Search, Tag, Pencil, Mic, MicOff } from 'lucide-react';
 
 const CATEGORIES: MemoryCategory[] = [
   'academic', 'personal', 'goals', 'preferences', 'habits', 'patterns', 'projects', 'important_events', 'creative_ideas',
@@ -186,6 +187,18 @@ function CreateMemoryModal({ memory, onClose, onCreated }: { memory?: Memory; on
   const [importance, setImportance] = useState(memory?.importance || 'normal');
   const [tags, setTags] = useState(memory?.tags?.join(', ') || '');
   const [saving, setSaving] = useState(false);
+  const speech = useSpeechRecognition();
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- see the identical comment in AcademiaHierarchy.tsx's LogClassModal
+  useEffect(() => () => speech.stop(), [speech.stop]);
+
+  function handleToggleVoiceCapture() {
+    if (speech.isListening) { speech.stop(); return; }
+    speech.start(
+      (text) => setContent((prev) => (prev.trim() ? `${prev.trim()} ${text}` : text)),
+      (message) => toast.show(message, 'error'),
+    );
+  }
 
   async function handleCreate() {
     if (!content.trim()) { toast.show('Please write something.', 'error'); return; }
@@ -206,8 +219,21 @@ function CreateMemoryModal({ memory, onClose, onCreated }: { memory?: Memory; on
     <Modal open={true} onClose={onClose} title={memory ? 'Edit Memory' : 'New Memory'} maxWidth="600px">
       <div className="space-y-4">
         <div>
-          <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Content</label>
+          <div className="mb-1.5 flex items-center justify-between">
+            <label className="block text-xs font-medium text-[var(--text-secondary)]">Content</label>
+            {speech.isSupported && (
+              <button
+                type="button"
+                onClick={handleToggleVoiceCapture}
+                title={speech.isListening ? 'Stop voice capture' : 'Capture by speaking'}
+                className={`flex items-center gap-1.5 rounded-lg px-2 py-0.5 text-xs font-medium hover:bg-[var(--accent)]/10 ${speech.isListening ? 'text-rose-400' : 'text-[var(--accent-secondary)]'}`}
+              >
+                {speech.isListening ? <MicOff size={12} /> : <Mic size={12} />} {speech.isListening ? 'Stop' : 'Speak'}
+              </button>
+            )}
+          </div>
           <textarea value={content} onChange={(e) => setContent(e.target.value)} placeholder="What do you want ALORA to remember?" rows={4} className="w-full rounded-xl border border-ink/10 bg-ink/[0.03] px-4 py-3 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50" />
+          {speech.isListening && <p className="mt-1 text-xs text-[var(--text-secondary)]">Listening... tap Stop when you're done.</p>}
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
