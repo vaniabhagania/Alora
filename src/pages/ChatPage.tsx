@@ -7,9 +7,10 @@ import type { ChatMessage } from '@/lib/ai/types';
 import { buildChatContext } from '@/lib/ai/buildContext';
 import { detectNavIntent, type NavIntent } from '@/lib/nav';
 import { useToast } from '@/lib/toast';
-import { Send, Sparkles, LayoutGrid, X, ImagePlus } from 'lucide-react';
+import { Send, Sparkles, LayoutGrid, X, Paperclip, FileText } from 'lucide-react';
 
 const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
+const MAX_PDF_BYTES = 15 * 1024 * 1024;
 
 function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -30,7 +31,7 @@ export function ChatPage() {
   const [input, setInput] = useState('');
   const [thinking, setThinking] = useState(false);
   const [navSuggestion, setNavSuggestion] = useState<NavIntent | null>(null);
-  const [attachedImage, setAttachedImage] = useState<{ previewUrl: string; mimeType: string; base64: string } | null>(null);
+  const [attachedFile, setAttachedFile] = useState<{ previewUrl: string | null; mimeType: string; base64: string; name: string } | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const toast = useToast();
@@ -98,27 +99,38 @@ export function ChatPage() {
     }
   }, [messages, thinking]);
 
-  async function handleImageSelect(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
-    if (!file.type.startsWith('image/')) { toast.show('Please choose an image file.', 'error'); return; }
-    if (file.size > MAX_IMAGE_BYTES) { toast.show('Image is too large (max 4MB).', 'error'); return; }
+
+    const isImage = file.type.startsWith('image/');
+    const isPdf = file.type === 'application/pdf';
+    if (!isImage && !isPdf) {
+      toast.show("Alora can read images and PDFs here. For PowerPoint or Word docs, export to PDF first — raw .pptx/.docx aren't something the model can read directly.", 'error');
+      return;
+    }
+    const maxBytes = isImage ? MAX_IMAGE_BYTES : MAX_PDF_BYTES;
+    if (file.size > maxBytes) {
+      toast.show(`File is too large (max ${Math.round(maxBytes / (1024 * 1024))}MB).`, 'error');
+      return;
+    }
+
     const base64 = await fileToBase64(file);
-    setAttachedImage({ previewUrl: URL.createObjectURL(file), mimeType: file.type, base64 });
+    setAttachedFile({ previewUrl: isImage ? URL.createObjectURL(file) : null, mimeType: file.type, base64, name: file.name });
   }
 
   async function handleSend() {
-    if ((!input.trim() && !attachedImage) || thinking) return;
+    if ((!input.trim() && !attachedFile) || thinking) return;
     const userMsg: ChatMessage = {
       role: 'user',
       content: input.trim(),
       timestamp: new Date().toISOString(),
-      ...(attachedImage ? { attachments: [{ mimeType: attachedImage.mimeType, data: attachedImage.base64 }] } : {}),
+      ...(attachedFile ? { attachments: [{ mimeType: attachedFile.mimeType, data: attachedFile.base64, name: attachedFile.name }] } : {}),
     };
     setMessages((prev) => [...prev, userMsg]);
     setInput('');
-    setAttachedImage(null);
+    setAttachedFile(null);
     setThinking(true);
 
     const intent = detectNavIntent(userMsg.content);
@@ -192,7 +204,14 @@ export function ChatPage() {
                   </div>
                 )}
                 {msg.attachments?.[0] && (
-                  <img src={`data:${msg.attachments[0].mimeType};base64,${msg.attachments[0].data}`} alt="Attached" className="mb-2 max-h-60 rounded-xl border border-ink/10" />
+                  msg.attachments[0].mimeType.startsWith('image/') ? (
+                    <img src={`data:${msg.attachments[0].mimeType};base64,${msg.attachments[0].data}`} alt="Attached" className="mb-2 max-h-60 rounded-xl border border-ink/10" />
+                  ) : (
+                    <div className="mb-2 flex items-center gap-2 rounded-xl border border-ink/10 bg-ink/[0.03] px-3 py-2">
+                      <FileText size={16} className="shrink-0 text-[var(--text-secondary)]" />
+                      <span className="truncate text-xs text-[var(--text-secondary)]">{msg.attachments[0].name || 'Attached file'}</span>
+                    </div>
+                  )
                 )}
                 {msg.content && <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>}
               </div>
@@ -244,22 +263,29 @@ export function ChatPage() {
       )}
 
       <div className="border-t border-ink/8 px-4 py-4 md:px-8">
-        {attachedImage && (
+        {attachedFile && (
           <div className="mx-auto mb-2 flex max-w-3xl items-center gap-2">
             <div className="relative">
-              <img src={attachedImage.previewUrl} alt="Attached" className="h-14 w-14 rounded-lg border border-ink/10 object-cover" />
-              <button onClick={() => setAttachedImage(null)} className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-rose-500 text-white">
+              {attachedFile.previewUrl ? (
+                <img src={attachedFile.previewUrl} alt="Attached" className="h-14 w-14 rounded-lg border border-ink/10 object-cover" />
+              ) : (
+                <div className="flex h-14 w-14 flex-col items-center justify-center gap-0.5 rounded-lg border border-ink/10 bg-ink/[0.03] p-1">
+                  <FileText size={18} className="text-[var(--text-secondary)]" />
+                  <span className="w-full truncate text-center text-[8px] text-[var(--text-secondary)]">{attachedFile.name}</span>
+                </div>
+              )}
+              <button onClick={() => setAttachedFile(null)} className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-rose-500 text-white">
                 <X size={12} />
               </button>
             </div>
-            <p className="text-xs text-[var(--text-secondary)]">Image attached — Alora can see this.</p>
+            <p className="text-xs text-[var(--text-secondary)]">{attachedFile.previewUrl ? 'Image attached' : 'PDF attached'} — Alora can read this.</p>
           </div>
         )}
         <div className="mx-auto flex max-w-3xl items-end gap-2">
           <button onClick={() => fileInputRef.current?.click()} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-ink/10 text-[var(--text-secondary)] hover:bg-ink/5 hover:text-[var(--text-primary)]">
-            <ImagePlus size={18} />
+            <Paperclip size={18} />
           </button>
-          <input ref={fileInputRef} type="file" accept="image/*" className="sr-only" onChange={handleImageSelect} />
+          <input ref={fileInputRef} type="file" accept="image/*,application/pdf" className="sr-only" onChange={handleFileSelect} />
           <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
@@ -269,7 +295,7 @@ export function ChatPage() {
             className="flex-1 resize-none rounded-xl border border-ink/10 bg-ink/[0.03] px-4 py-3 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50"
             style={{ maxHeight: '120px' }}
           />
-          <button onClick={handleSend} disabled={(!input.trim() && !attachedImage) || thinking} className="btn-primary flex h-11 w-11 shrink-0 items-center justify-center">
+          <button onClick={handleSend} disabled={(!input.trim() && !attachedFile) || thinking} className="btn-primary flex h-11 w-11 shrink-0 items-center justify-center">
             <Send size={18} />
           </button>
         </div>
