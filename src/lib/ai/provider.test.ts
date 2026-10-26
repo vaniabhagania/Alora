@@ -23,6 +23,14 @@ describe('LocalAIProvider.chat — crisis-detection gate', () => {
     expect(res.suggestedActions.length).toBeGreaterThan(0);
   });
 
+  it('offers India helplines (the student is in India) as well as the international ones', async () => {
+    const res = await local.chat(userMsg('I want to end it all'), emptyContext());
+    expect(res.message).toMatch(/14416/);
+    expect(res.message).toMatch(/1800-599-0019/);
+    expect(res.message).toMatch(/\b112\b/);
+    expect(res.message).toMatch(/findahelpline\.com/);
+  });
+
   it('does not trip the crisis gate on ordinary messages', async () => {
     const res = await local.chat(userMsg('what should I study today?'), emptyContext());
     expect(res.message).not.toMatch(/988|crisis text line/i);

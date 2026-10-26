@@ -6,13 +6,13 @@ import { CourseView } from '@/components/academia/CourseView';
 import { WeakSpotsView } from '@/components/academia/WeakSpotsView';
 import { StrengthsView } from '@/components/academia/StrengthsView';
 import { TimelineView } from '@/components/academia/TimelineView';
-import { Skeleton } from '@/components/ui';
+import { Skeleton, ErrorState } from '@/components/ui';
 import { Brain, ListTree, AlertTriangle, TrendingUp, Calendar } from 'lucide-react';
 
 type View = 'dashboard' | 'hierarchy' | 'course' | 'weak' | 'strengths' | 'timeline';
 
 export function AcademiaPage() {
-  const { data, loading, reload } = useAcademicData();
+  const { data, loading, error, reload, retry } = useAcademicData();
   const [view, setView] = useState<View>('dashboard');
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
 
@@ -30,6 +30,14 @@ export function AcademiaPage() {
           <Skeleton className="h-20" />
           <Skeleton className="h-20" />
         </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="mx-auto max-w-5xl px-4 py-6 md:px-8 md:py-8">
+        <ErrorState title="Couldn't load Academia" message="Your courses and classes are safe — this is a connection problem. Nothing is shown rather than something wrong." onRetry={retry} />
       </div>
     );
   }
@@ -54,6 +62,7 @@ export function AcademiaPage() {
           <button
             key={tab.id}
             onClick={() => setView(tab.id)}
+            aria-pressed={view === tab.id || (tab.id === 'hierarchy' && view === 'course')}
             className={`flex shrink-0 items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition-colors ${
               view === tab.id ? 'bg-[var(--accent)]/15 text-[var(--text-primary)]' : 'text-[var(--text-secondary)] hover:bg-ink/5'
             }`}

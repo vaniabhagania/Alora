@@ -90,6 +90,8 @@ export interface StudentContext {
   activeGoals: Goal[];
   completedTasksThisWeek: number;
   totalTasksThisWeek: number;
+  /** Names of data sources that failed to load. Empty when the picture is complete; never assume "nothing there" when it isn't. */
+  loadErrors: string[];
 }
 
 export interface ContextQueryOptions {
@@ -102,10 +104,11 @@ export type EventType =
   | 'task_created' | 'task_completed' | 'task_postponed' | 'task_deleted'
   | 'quiz_started' | 'quiz_completed' | 'question_answered' | 'mistake_recorded'
   | 'topic_reviewed' | 'topic_mastery_changed'
-  | 'class_logged' | 'journal_created' | 'journal_saved_to_memory'
+  | 'class_logged' | 'journal_created' | 'journal_saved_to_memory' | 'journal_reflected'
   | 'goal_created' | 'goal_progress_updated' | 'goal_completed'
   | 'habit_completed' | 'habit_skipped'
   | 'memory_created' | 'memory_updated' | 'memory_corrected'
   | 'world_created' | 'world_activated' | 'world_theme_changed'
+  | 'novel_scene_saved'
   | 'identity_created' | 'identity_progress_updated'
   | 'chat_message_sent' | 'chat_conversation_created' | 'distress_flagged';

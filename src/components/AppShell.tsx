@@ -1,9 +1,9 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { NAV_ITEMS } from '@/lib/nav';
 import { useAuth } from '@/lib/auth';
 import { useWorlds } from '@/lib/worlds';
 import { useSettings } from '@/lib/settingsContext';
-import { LogOut, Sparkles, Globe, MoreHorizontal, X } from 'lucide-react';
+import { LogOut, Sparkles, Globe, MoreHorizontal, X, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 
 interface AppShellProps {
   currentPage: string;
@@ -15,8 +15,23 @@ export function AppShell({ currentPage, onNavigate, children }: AppShellProps) {
   const { profile, signOut } = useAuth();
   const { activeWorld } = useWorlds();
   const { hiddenNavItems } = useSettings();
-  const [collapsed, setCollapsed] = useState(false);
+  // Remembered per device so the sidebar doesn't re-expand on every reload.
+  const [collapsed, setCollapsed] = useState(() => {
+    try { return localStorage.getItem('alora-sidebar-collapsed') === '1'; } catch { return false; }
+  });
   const [moreOpen, setMoreOpen] = useState(false);
+
+  useEffect(() => {
+    try { localStorage.setItem('alora-sidebar-collapsed', collapsed ? '1' : '0'); } catch { /* storage unavailable */ }
+  }, [collapsed]);
+
+  // Escape closes the phone "More" sheet.
+  useEffect(() => {
+    if (!moreOpen) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setMoreOpen(false); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [moreOpen]);
 
   const displayName = profile?.display_name || 'there';
   // 'home' and 'settings' always stay visible — a hidden nav item can't leave
@@ -26,7 +41,7 @@ export function AppShell({ currentPage, onNavigate, children }: AppShellProps) {
   );
 
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="flex h-dvh overflow-hidden">
       {/* Ambient background */}
       <div className="ambient-bg">
         <div className="ambient-blob" />
@@ -55,7 +70,7 @@ export function AppShell({ currentPage, onNavigate, children }: AppShellProps) {
           )}
         </div>
 
-        <nav className="flex-1 overflow-y-auto px-3 py-2">
+        <nav className="flex-1 overflow-y-auto px-3 py-2" aria-label="Primary">
           {visibleNavItems.map((item) => {
             const Icon = item.icon;
             const active = currentPage === item.id;
@@ -63,6 +78,8 @@ export function AppShell({ currentPage, onNavigate, children }: AppShellProps) {
               <button
                 key={item.id}
                 onClick={() => onNavigate(item.id)}
+                aria-label={item.label}
+                aria-current={active ? 'page' : undefined}
                 className={`group mb-1 flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-all ${
                   active
                     ? 'bg-[var(--accent)]/15 text-[var(--text-primary)]'
@@ -117,14 +134,18 @@ export function AppShell({ currentPage, onNavigate, children }: AppShellProps) {
           )}
           <button
             onClick={() => setCollapsed(!collapsed)}
-            className="hidden w-full items-center justify-center rounded-xl px-3 py-2 text-xs text-[var(--text-secondary)] hover:bg-ink/5 hover:text-[var(--text-primary)]"
+            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            aria-expanded={!collapsed}
+            title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            className="flex w-full items-center justify-center gap-2 rounded-xl px-3 py-2 text-xs text-[var(--text-secondary)] hover:bg-ink/5 hover:text-[var(--text-primary)]"
           >
-            {collapsed ? '→' : '← Collapse'}
+            {collapsed ? <PanelLeftOpen size={16} /> : <><PanelLeftClose size={16} /> Collapse</>}
           </button>
           <button
             onClick={signOut}
             className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm text-[var(--text-secondary)] hover:bg-rose-500/10 hover:text-rose-400"
             title="Sign out"
+            aria-label="Sign out"
           >
             <LogOut size={18} className="shrink-0" />
             {!collapsed && <span>Sign out</span>}
@@ -134,7 +155,7 @@ export function AppShell({ currentPage, onNavigate, children }: AppShellProps) {
 
       {/* Main content */}
       <div className="flex flex-1 flex-col overflow-hidden">
-        <main className="flex-1 overflow-y-auto pb-20 md:pb-0">
+        <main className="flex-1 overflow-y-auto pb-[calc(5rem+env(safe-area-inset-bottom))] md:pb-0">
           <div key={currentPage} className="page-enter h-full">
             {children}
           </div>
@@ -144,7 +165,7 @@ export function AppShell({ currentPage, onNavigate, children }: AppShellProps) {
       {/* Mobile bottom nav — first 4 items get a permanent slot; everything
           else (including when there are 5 or fewer items total) lives
           behind "More" so it's always reachable, never silently cut off. */}
-      <nav className="fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around border-t border-ink/10 bg-[var(--bg-secondary)]/90 backdrop-blur-xl md:hidden">
+      <nav aria-label="Primary (mobile)" className="fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around border-t border-ink/10 bg-[var(--bg-secondary)]/90 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl md:hidden">
         {visibleNavItems.slice(0, 4).map((item) => {
           const Icon = item.icon;
           const active = currentPage === item.id && !moreOpen;
@@ -152,19 +173,22 @@ export function AppShell({ currentPage, onNavigate, children }: AppShellProps) {
             <button
               key={item.id}
               onClick={() => { setMoreOpen(false); onNavigate(item.id); }}
-              className={`flex flex-col items-center gap-1 px-2 py-3 transition-colors ${
+              aria-current={active ? 'page' : undefined}
+              className={`flex min-w-[56px] flex-col items-center gap-1 px-2 py-3 transition-colors ${
                 active ? 'text-[var(--accent-secondary)]' : 'text-[var(--text-secondary)]'
               }`}
             >
               <Icon size={20} />
-              <span className="text-[10px] font-medium">{item.label.split(' ')[0]}</span>
+              <span className="text-[10px] font-medium">{item.shortLabel}</span>
             </button>
           );
         })}
         {visibleNavItems.length > 4 && (
           <button
             onClick={() => setMoreOpen(!moreOpen)}
-            className={`flex flex-col items-center gap-1 px-2 py-3 transition-colors ${
+            aria-expanded={moreOpen}
+            aria-haspopup="true"
+            className={`flex min-w-[56px] flex-col items-center gap-1 px-2 py-3 transition-colors ${
               moreOpen || visibleNavItems.slice(4).some((i) => i.id === currentPage) ? 'text-[var(--accent-secondary)]' : 'text-[var(--text-secondary)]'
             }`}
           >
@@ -178,20 +202,22 @@ export function AppShell({ currentPage, onNavigate, children }: AppShellProps) {
       {moreOpen && (
         <>
           <div className="fixed inset-0 z-40 bg-black/40 md:hidden" onClick={() => setMoreOpen(false)} />
-          <div className="fixed bottom-16 left-0 right-0 z-40 grid grid-cols-4 gap-1 border-t border-ink/8 bg-[var(--bg-secondary)]/98 p-3 backdrop-blur-xl md:hidden">
+          <div role="menu" aria-label="More pages" className="fixed bottom-[calc(4rem+env(safe-area-inset-bottom))] left-0 right-0 z-40 grid grid-cols-4 gap-1 border-t border-ink/8 bg-[var(--bg-secondary)]/98 p-3 backdrop-blur-xl md:hidden">
             {visibleNavItems.slice(4).map((item) => {
               const Icon = item.icon;
               const active = currentPage === item.id;
               return (
                 <button
                   key={item.id}
+                  role="menuitem"
                   onClick={() => { setMoreOpen(false); onNavigate(item.id); }}
+                  aria-current={active ? 'page' : undefined}
                   className={`flex flex-col items-center gap-1 rounded-xl px-2 py-3 transition-colors ${
                     active ? 'bg-[var(--accent)]/15 text-[var(--accent-secondary)]' : 'text-[var(--text-secondary)] hover:bg-ink/5'
                   }`}
                 >
                   <Icon size={20} />
-                  <span className="text-[10px] font-medium">{item.label.split(' ')[0]}</span>
+                  <span className="text-[10px] font-medium">{item.shortLabel}</span>
                 </button>
               );
             })}

@@ -7,7 +7,8 @@ import type {
   StudentContext, ContextType, ExtendedMemory,
   ActivityEvent, InsightRecord,
 } from './types';
-import { getRecentEvents } from './events';
+import { getRecentEvents, loadActivityStreak } from './events';
+import { startOfLocalDay, endOfLocalDay } from '@/lib/dates';
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -20,6 +21,14 @@ export async function getStudentContext(
 
   const fields = getContextFields(contextType);
 
+  // Every source reports whether it loaded. A failed query used to become an empty list, which every screen
+  // then presented as fact ("nothing overdue", "no goals") — now the failure is carried alongside the data.
+  const loadErrors: string[] = [];
+  const rows = <T,>(name: string, r: { data: unknown; error: { message: string } | null }): T[] => {
+    if (r.error) { loadErrors.push(name); console.warn(`[brain] could not load ${name}:`, r.error.message); return []; }
+    return (r.data as T[]) || [];
+  };
+
   // PostgrestBuilder.then() types as PromiseLike, not Promise (no catch/finally) —
   // Promise.all() accepts PromiseLike elements just fine.
   const queries: PromiseLike<unknown>[] = [];
@@ -27,67 +36,72 @@ export async function getStudentContext(
   if (fields.profile) {
     queries.push(
       supabase.from('alora_profiles').select('*').eq('user_id', user.id).maybeSingle()
-        .then(r => r.data as AloraProfile | null),
+        .then(r => { if (r.error) { loadErrors.push('profile'); return null; } return r.data as AloraProfile | null; }),
     );
   }
   if (fields.tasks) {
+    // Open tasks (all of them that matter) plus recently finished ones. A single "earliest 100 by deadline"
+    // query let old completed tasks crowd real overdue and upcoming work out of the picture.
+    const doneSince = new Date(Date.now() - 30 * DAY_MS).toISOString();
     queries.push(
-      supabase.from('tasks').select('*').order('deadline', { ascending: true }).limit(100)
-        .then(r => r.data as Task[] || []),
+      Promise.all([
+        supabase.from('tasks').select('*').neq('status', 'completed').order('deadline', { ascending: true }).limit(300),
+        supabase.from('tasks').select('*').eq('status', 'completed').gte('completed_at', doneSince).order('completed_at', { ascending: false }).limit(200),
+      ]).then(([open, done]) => [...rows<Task>('tasks', open), ...rows<Task>('tasks', done)]),
     );
   }
   if (fields.courses) {
     queries.push(
       supabase.from('courses').select('*').limit(50)
-        .then(r => r.data as Course[] || []),
+        .then(r => rows<Course>('courses', r)),
     );
   }
   if (fields.topics) {
     queries.push(
       supabase.from('topics').select('*').limit(200)
-        .then(r => r.data as Topic[] || []),
+        .then(r => rows<Topic>('topics', r)),
     );
   }
   if (fields.classes) {
     queries.push(
       supabase.from('classes').select('*').order('session_date', { ascending: false }).limit(20)
-        .then(r => r.data as ClassSession[] || []),
+        .then(r => rows<ClassSession>('classes', r)),
     );
   }
   if (fields.quizAttempts) {
     queries.push(
       supabase.from('quiz_attempts').select('*').order('completed_at', { ascending: false }).limit(20)
-        .then(r => r.data as QuizAttempt[] || []),
+        .then(r => rows<QuizAttempt>('quiz attempts', r)),
     );
   }
   if (fields.goals) {
     queries.push(
       supabase.from('goals').select('*').order('created_at', { ascending: false })
-        .then(r => r.data as Goal[] || []),
+        .then(r => rows<Goal>('goals', r)),
     );
   }
   if (fields.identities) {
     queries.push(
       supabase.from('identities').select('*').order('created_at', { ascending: false })
-        .then(r => r.data as Identity[] || []),
+        .then(r => rows<Identity>('identities', r)),
     );
   }
   if (fields.habits) {
     queries.push(
       supabase.from('habits').select('*').eq('is_active', true)
-        .then(r => r.data as Habit[] || []),
+        .then(r => rows<Habit>('habits', r)),
     );
   }
   if (fields.journal) {
     queries.push(
       supabase.from('journal_entries').select('*').order('created_at', { ascending: false }).limit(30)
-        .then(r => r.data as JournalEntry[] || []),
+        .then(r => rows<JournalEntry>('journal', r)),
     );
   }
   if (fields.memories) {
     queries.push(
       supabase.from('memories').select('*').eq('status', 'active').order('created_at', { ascending: false }).limit(50)
-        .then(r => (r.data as ExtendedMemory[]) || []),
+        .then(r => rows<ExtendedMemory>('memories', r)),
     );
   }
   if (fields.events) {
@@ -98,11 +112,12 @@ export async function getStudentContext(
   if (fields.insights) {
     queries.push(
       supabase.from('insights').select('*').eq('is_dismissed', false).order('created_at', { ascending: false }).limit(10)
-        .then(r => (r.data as InsightRecord[]) || []),
+        .then(r => rows<InsightRecord>('insights', r)),
     );
   }
 
-  const results = await Promise.all(queries);
+  const streakQuery = fields.profile ? loadActivityStreak() : Promise.resolve(null);
+  const [results, streakResult] = await Promise.all([Promise.all(queries), streakQuery]);
 
   let idx = 0;
   const profile = fields.profile ? (results[idx++] as AloraProfile | null) : null;
@@ -120,8 +135,8 @@ export async function getStudentContext(
   const insights = fields.insights ? (results[idx++] as InsightRecord[]) : [];
 
   const now = Date.now();
-  const todayStart = new Date(now);
-  todayStart.setHours(0, 0, 0, 0);
+  const todayStart = startOfLocalDay(new Date(now)).getTime();
+  const todayEnd = endOfLocalDay(new Date(now)).getTime(); // calendar-aware, so 23h/25h DST days are still "today"
   const weekStart = new Date(now - WEEK_MS);
 
   const overdueTasks = tasks.filter(
@@ -131,7 +146,7 @@ export async function getStudentContext(
     (t) => t.status !== 'completed' && t.deadline && new Date(t.deadline).getTime() >= now && new Date(t.deadline).getTime() <= now + WEEK_MS,
   );
   const todayTasks = tasks.filter(
-    (t) => t.status !== 'completed' && t.deadline && new Date(t.deadline).getTime() >= todayStart.getTime() && new Date(t.deadline).getTime() < todayStart.getTime() + DAY_MS,
+    (t) => t.status !== 'completed' && t.deadline && new Date(t.deadline).getTime() >= todayStart && new Date(t.deadline).getTime() <= todayEnd,
   );
 
   const weekTasks = tasks.filter(
@@ -142,6 +157,17 @@ export async function getStudentContext(
   const quizAverage = quizAttempts.length > 0
     ? Math.round(quizAttempts.reduce((sum, a) => sum + (a.total_questions > 0 ? (a.correct_count / a.total_questions) * 100 : 0), 0) / quizAttempts.length)
     : 0;
+
+  // The streak comes from the event log; the stored profile value is only a fallback (and is kept in step below).
+  const streak = streakResult ? streakResult.streak : (profile?.streak_days ?? 0);
+  if (!streakResult && fields.profile) loadErrors.push('streak');
+  if (profile && streakResult && (profile.streak_days !== streakResult.streak || profile.last_active_date !== streakResult.lastActive)) {
+    // Best effort: keep the stored copy honest so other readers (and other devices) agree. Never blocks or throws.
+    void supabase.from('alora_profiles')
+      .update({ streak_days: streakResult.streak, last_active_date: streakResult.lastActive })
+      .eq('user_id', user.id)
+      .then(({ error }) => { if (error) console.warn('[brain] could not cache streak:', error.message); });
+  }
 
   const weakTopics = computeWeakTopics(topics, quizAttempts);
   const strongTopics = topics
@@ -164,7 +190,7 @@ export async function getStudentContext(
     memories,
     activityEvents,
     insights,
-    streak: profile?.streak_days ?? 0,
+    streak,
     quizAverage,
     overdueTasks,
     upcomingTasks,
@@ -174,6 +200,7 @@ export async function getStudentContext(
     activeGoals,
     completedTasksThisWeek,
     totalTasksThisWeek: weekTasks.length,
+    loadErrors,
   };
 }
 
@@ -276,6 +303,6 @@ function emptyContext(): StudentContext {
     habits: [], journalEntries: [], memories: [], activityEvents: [],
     insights: [], streak: 0, quizAverage: 0, overdueTasks: [],
     upcomingTasks: [], todayTasks: [], weakTopics: [], strongTopics: [],
-    activeGoals: [], completedTasksThisWeek: 0, totalTasksThisWeek: 0,
+    activeGoals: [], completedTasksThisWeek: 0, totalTasksThisWeek: 0, loadErrors: [],
   };
 }

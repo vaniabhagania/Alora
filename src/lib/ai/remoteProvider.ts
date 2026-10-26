@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase';
-import type { AIChatResponse, AIProvider, ChatContext, ChatMessage } from './types';
+import type { AIChatResponse, AIProvider, ChatContext, ChatMessage, ChatOptions } from './types';
 
 /**
  * Distinguishes "the edge function isn't set up" (not deployed, or its
@@ -31,44 +31,48 @@ async function isConfigurationError(err: unknown): Promise<boolean> {
  * The edge function only persists a reply after it successfully calls
  * Gemini, so a fallback reply (produced entirely client-side) would
  * otherwise never be written down — a day the model is unreachable becomes
- * a silent gap in the user's saved chat history. Mirrors the edge
- * function's own "reuse a conversation still active in the last 6 hours,
- * otherwise start a new one" grouping so history reads the same either way.
+ * a silent gap in the user's saved chat history. Targets the same
+ * conversation the edge function would (see ChatOptions) and returns its id,
+ * or null when nothing was saved.
  */
-async function persistFallbackExchange(messages: ChatMessage[], assistantText: string): Promise<void> {
+async function persistFallbackExchange(messages: ChatMessage[], assistantText: string, options: ChatOptions): Promise<string | null> {
+  if (options.persist === false) return null;
   const lastUserMessage = [...messages].reverse().find((m) => m.role === 'user');
-  if (!lastUserMessage) return;
+  if (!lastUserMessage) return null;
 
-  const { data: recentConvo } = await supabase
-    .from('chat_conversations')
-    .select('id, updated_at')
-    .order('updated_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  const sixHoursAgo = Date.now() - 6 * 60 * 60 * 1000;
   let conversationId: string | null = null;
 
-  if (recentConvo && new Date(recentConvo.updated_at as string).getTime() > sixHoursAgo) {
-    conversationId = recentConvo.id as string;
+  if (typeof options.conversationId === 'string') {
+    const { data } = await supabase.from('chat_conversations').select('id').eq('id', options.conversationId).maybeSingle();
+    if (data) conversationId = data.id as string;
+  } else if (options.conversationId === undefined) {
+    // Legacy grouping: reuse a conversation still active in the last 6 hours.
+    const { data: recent } = await supabase
+      .from('chat_conversations').select('id, updated_at').order('updated_at', { ascending: false }).limit(1).maybeSingle();
+    if (recent && Date.now() - new Date(recent.updated_at as string).getTime() < 6 * 60 * 60 * 1000) conversationId = recent.id as string;
+  }
+
+  if (conversationId) {
     await supabase.from('chat_conversations').update({ updated_at: new Date().toISOString() }).eq('id', conversationId);
   } else {
-    const { data: newConvo } = await supabase
+    const { data: created, error } = await supabase
       .from('chat_conversations')
-      .insert({ title: lastUserMessage.content.slice(0, 60) })
+      .insert({ title: lastUserMessage.content.slice(0, 60) || 'New conversation' })
       .select('id')
       .maybeSingle();
-    conversationId = (newConvo?.id as string) ?? null;
+    if (error || !created) return null;
+    conversationId = created.id as string;
   }
-  if (!conversationId) return;
 
-  await supabase.from('chat_messages').insert([
+  const { error } = await supabase.from('chat_messages').insert([
     { conversation_id: conversationId, role: 'user', content: lastUserMessage.content },
     // Tagged so System Health can compute a real fallback rate instead of
     // guessing — a genuine signal for "is the model actually answering,
     // or is every reply the rule-based backup" rather than a fabricated one.
     { conversation_id: conversationId, role: 'assistant', content: assistantText, metadata: { source: 'fallback' } },
   ]);
+  if (error) { console.warn('Failed to persist fallback chat exchange:', error.message); return null; }
+  return conversationId;
 }
 
 /**
@@ -79,7 +83,7 @@ async function persistFallbackExchange(messages: ChatMessage[], assistantText: s
  * not this client.
  *
  * Only `chat()` is upgraded — the rest of the AIProvider surface
- * (generateQuiz, summarizeClass, etc.) delegates to the wrapped local
+ * (summarizeClass, extractTasks, etc.) delegates to the wrapped local
  * provider unchanged, since those weren't part of this request.
  *
  * If the edge function is unreachable or misconfigured (e.g. the project
@@ -93,7 +97,7 @@ export class RemoteAIProvider implements AIProvider {
 
   constructor(private local: AIProvider) {}
 
-  async chat(messages: ChatMessage[], context: ChatContext): Promise<AIChatResponse> {
+  async chat(messages: ChatMessage[], context: ChatContext, options: ChatOptions = {}): Promise<AIChatResponse> {
     // Gemini's free tier throws transient 503 "high demand" errors fairly
     // often, in bursts that can outlast a single quick retry — three
     // attempts with backoff clears most of them before giving up and
@@ -102,7 +106,7 @@ export class RemoteAIProvider implements AIProvider {
     for (let attempt = 0; attempt <= backoffMs.length; attempt++) {
       try {
         const { data, error } = await supabase.functions.invoke('alora-chat', {
-          body: { messages, context },
+          body: { messages, context, conversationId: options.conversationId, persist: options.persist },
         });
 
         if (error) throw error;
@@ -112,6 +116,7 @@ export class RemoteAIProvider implements AIProvider {
           message: data.message,
           insights: Array.isArray(data.insights) ? data.insights : [],
           suggestedActions: Array.isArray(data.suggestedActions) ? data.suggestedActions : [],
+          conversationId: typeof data.conversationId === 'string' ? data.conversationId : null,
         };
       } catch (err) {
         if (await isConfigurationError(err)) {
@@ -126,15 +131,14 @@ export class RemoteAIProvider implements AIProvider {
       }
     }
 
-    const localResponse = await this.local.chat(messages, context);
-    persistFallbackExchange(messages, localResponse.message).catch((err) => {
+    const localResponse = await this.local.chat(messages, context, options);
+    let conversationId: string | null = null;
+    try {
+      conversationId = await persistFallbackExchange(messages, localResponse.message, options);
+    } catch (err) {
       console.warn('Failed to persist fallback chat exchange:', err);
-    });
-    return localResponse;
-  }
-
-  generateQuiz(...args: Parameters<AIProvider['generateQuiz']>) {
-    return this.local.generateQuiz(...args);
+    }
+    return { ...localResponse, conversationId };
   }
 
   summarizeClass(...args: Parameters<AIProvider['summarizeClass']>) {
@@ -147,10 +151,6 @@ export class RemoteAIProvider implements AIProvider {
 
   reflect(...args: Parameters<AIProvider['reflect']>) {
     return this.local.reflect(...args);
-  }
-
-  curateNovelScene(...args: Parameters<AIProvider['curateNovelScene']>) {
-    return this.local.curateNovelScene(...args);
   }
 
   searchMemories(...args: Parameters<AIProvider['searchMemories']>) {

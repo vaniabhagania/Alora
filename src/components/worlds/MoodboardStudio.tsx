@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth';
 import { useWorlds } from '@/lib/worlds';
+import { visibleWorldDescription } from '@/lib/moodboardAutomation';
 import { useToast } from '@/lib/toast';
 import type { World, WorldElement, WorldElementType, WorldThemeSettings } from '@/lib/types';
 import { Modal, ConfirmModal } from '@/components/Modal';
@@ -10,7 +11,7 @@ import { AnalyzeWorld } from '@/components/worlds/AnalyzeWorld';
 import {
   Plus, Image, Type, Quote, Palette, Shapes, Sticker, Music,
   FileText, Calendar, ArrowLeft, Copy, Trash2,
-  Sparkles, ChevronUp, ChevronDown,
+  Sparkles, ChevronUp, ChevronDown, SlidersHorizontal,
 } from 'lucide-react';
 
 interface WorldEditorProps {
@@ -18,27 +19,47 @@ interface WorldEditorProps {
   onBack: () => void;
 }
 
-export function WorldEditor({ world, onBack }: WorldEditorProps) {
-  const { updateWorldTheme, activateWorld } = useWorlds();
+export function WorldEditor({ world: openedWorld, onBack }: WorldEditorProps) {
+  const { worlds, updateWorldTheme, activateWorld } = useWorlds();
   const toast = useToast();
+  // The page hands over the world as it was when opened. Read the live copy instead, or "Set Active" and every
+  // Appearance change would leave this screen showing stale state until it was closed and reopened.
+  const world = worlds.find((w) => w.id === openedWorld.id) ?? openedWorld;
   const [elements, setElements] = useState<WorldElement[]>([]);
+  // Event handlers (drag, z-order, opacity) must act on the LATEST elements, not the ones from the render
+  // they were created in — saving a stale copy is how a z-order change used to be silently lost.
+  const elementsRef = useRef<WorldElement[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showAppearance, setShowAppearance] = useState(false);
   const [showAnalyze, setShowAnalyze] = useState(false);
   const [addDialog, setAddDialog] = useState<WorldElementType | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const [editTextId, setEditTextId] = useState<string | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
 
+  const commitElements = useCallback((next: WorldElement[]) => {
+    elementsRef.current = next;
+    setElements(next);
+  }, []);
+
   const loadElements = useCallback(async () => {
-    const { data } = await supabase
+    setLoadError(null);
+    const { data, error } = await supabase
       .from('world_elements')
       .select('*')
-      .eq('world_id', world.id)
+      .eq('world_id', openedWorld.id)
       .order('z_index', { ascending: true });
-    setElements((data as WorldElement[]) || []);
+    if (error) {
+      // An empty canvas here would look like "your board is empty" — and invite the person to start over on top of it.
+      setLoadError(error.message);
+      setLoading(false);
+      return;
+    }
+    commitElements((data as WorldElement[]) || []);
     setLoading(false);
-  }, [world.id]);
+  }, [openedWorld.id, commitElements]);
 
   useEffect(() => {
     loadElements();
@@ -47,7 +68,7 @@ export function WorldEditor({ world, onBack }: WorldEditorProps) {
   const selected = elements.find((e) => e.id === selectedId) || null;
 
   async function addElement(type: WorldElementType, props: Record<string, unknown> = {}) {
-    const maxZ = elements.length > 0 ? Math.max(...elements.map((e) => e.z_index)) : 0;
+    const maxZ = elementsRef.current.length > 0 ? Math.max(...elementsRef.current.map((e) => e.z_index)) : 0;
     const { data, error } = await supabase
       .from('world_elements')
       .insert({
@@ -70,47 +91,70 @@ export function WorldEditor({ world, onBack }: WorldEditorProps) {
     }
     if (data) {
       const newEl = data as WorldElement;
-      setElements((prev) => [...prev, newEl]);
+      commitElements([...elementsRef.current, newEl]);
       setSelectedId(newEl.id);
     }
   }
 
-  async function updateElement(id: string, updates: Partial<WorldElement>) {
-    setElements((prev) => prev.map((e) => e.id === id ? { ...e, ...updates } : e));
+  function updateElement(id: string, updates: Partial<WorldElement>) {
+    commitElements(elementsRef.current.map((e) => (e.id === id ? { ...e, ...updates } : e)));
   }
 
   const saveTimeoutRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const lastSaveErrorAt = useRef(0);
 
-  async function debouncedSave(id: string) {
-    const el = elements.find((e) => e.id === id);
+  /** Writes the element's CURRENT state (read at save time, not when the save was scheduled). */
+  const saveElementNow = useCallback(async (id: string) => {
+    const el = elementsRef.current.find((e) => e.id === id);
     if (!el) return;
+    const { error } = await supabase.from('world_elements').update({
+      pos_x: el.pos_x,
+      pos_y: el.pos_y,
+      width: el.width,
+      height: el.height,
+      rotation: el.rotation,
+      z_index: el.z_index,
+      opacity: el.opacity,
+      props: el.props,
+      updated_at: new Date().toISOString(),
+    }).eq('id', id);
+    if (error && Date.now() - lastSaveErrorAt.current > 5000) {
+      lastSaveErrorAt.current = Date.now();
+      toast.show("Couldn't save your last change to the board — it may not be there after a reload.", 'error');
+    }
+  }, [toast]);
+
+  function debouncedSave(id: string) {
     if (saveTimeoutRef.current[id]) clearTimeout(saveTimeoutRef.current[id]);
-    saveTimeoutRef.current[id] = setTimeout(async () => {
-      await supabase.from('world_elements').update({
-        pos_x: el.pos_x,
-        pos_y: el.pos_y,
-        width: el.width,
-        height: el.height,
-        rotation: el.rotation,
-        z_index: el.z_index,
-        opacity: el.opacity,
-        props: el.props,
-        updated_at: new Date().toISOString(),
-      }).eq('id', id);
+    saveTimeoutRef.current[id] = setTimeout(() => {
+      delete saveTimeoutRef.current[id];
+      void saveElementNow(id);
     }, 500);
   }
 
+  /** Leaving the board inside the 500 ms window used to throw the last move away. */
+  const flushSaves = useCallback(() => {
+    for (const [id, t] of Object.entries(saveTimeoutRef.current)) {
+      clearTimeout(t);
+      delete saveTimeoutRef.current[id];
+      void saveElementNow(id);
+    }
+  }, [saveElementNow]);
+
+  useEffect(() => flushSaves, [flushSaves]);
+
   async function deleteElement(id: string) {
-    await supabase.from('world_elements').delete().eq('id', id);
-    setElements((prev) => prev.filter((e) => e.id !== id));
-    setSelectedId(null);
+    const { error } = await supabase.from('world_elements').delete().eq('id', id);
     setDeleteConfirm(false);
+    if (error) { toast.show("Couldn't delete that element. It's still on your board.", 'error'); return; }
+    commitElements(elementsRef.current.filter((e) => e.id !== id));
+    setSelectedId(null);
   }
 
   async function duplicateElement(id: string) {
-    const el = elements.find((e) => e.id === id);
+    const el = elementsRef.current.find((e) => e.id === id);
     if (!el) return;
-    const { data } = await supabase.from('world_elements').insert({
+    const { data, error } = await supabase.from('world_elements').insert({
       world_id: world.id,
       element_type: el.element_type,
       pos_x: el.pos_x + 20,
@@ -122,21 +166,22 @@ export function WorldEditor({ world, onBack }: WorldEditorProps) {
       opacity: el.opacity,
       props: el.props,
     }).select('*').maybeSingle();
+    if (error) { toast.show("Couldn't duplicate that element.", 'error'); return; }
     if (data) {
-      setElements((prev) => [...prev, data as WorldElement]);
+      commitElements([...elementsRef.current, data as WorldElement]);
       setSelectedId((data as WorldElement).id);
     }
   }
 
   function bringForward(id: string) {
-    const el = elements.find((e) => e.id === id);
+    const el = elementsRef.current.find((e) => e.id === id);
     if (!el) return;
     updateElement(id, { z_index: el.z_index + 1 });
     debouncedSave(id);
   }
 
   function sendBackward(id: string) {
-    const el = elements.find((e) => e.id === id);
+    const el = elementsRef.current.find((e) => e.id === id);
     if (!el) return;
     updateElement(id, { z_index: Math.max(0, el.z_index - 1) });
     debouncedSave(id);
@@ -201,7 +246,7 @@ export function WorldEditor({ world, onBack }: WorldEditorProps) {
   }
 
   // Rotate handling
-  const rotateState = useRef<{ id: string; cx: number; cy: number; startAngle: number } | null>(null);
+  const rotateState = useRef<{ id: string; cx: number; cy: number; startAngle: number; origRotation: number } | null>(null);
 
   function startRotate(e: React.PointerEvent, el: WorldElement) {
     e.stopPropagation();
@@ -211,14 +256,16 @@ export function WorldEditor({ world, onBack }: WorldEditorProps) {
     const cx = rect.left + el.pos_x + el.width / 2;
     const cy = rect.top + el.pos_y + el.height / 2;
     const startAngle = Math.atan2(e.clientY - cy, e.clientX - cx) * 180 / Math.PI;
-    rotateState.current = { id: el.id, cx, cy, startAngle };
+    rotateState.current = { id: el.id, cx, cy, startAngle, origRotation: el.rotation };
   }
 
   function onRotateMove(e: React.PointerEvent) {
     if (!rotateState.current) return;
-    const { id, cx, cy, startAngle } = rotateState.current;
+    const { id, cx, cy, startAngle, origRotation } = rotateState.current;
     const currentAngle = Math.atan2(e.clientY - cy, e.clientX - cx) * 180 / Math.PI;
-    const rotation = currentAngle - startAngle + (elements.find((el) => el.id === id)?.rotation || 0);
+    // Relative to where the rotation STARTED. Adding the element's live rotation on every move fed each result back
+    // into the next one, so the shape spun faster and faster than the pointer.
+    const rotation = currentAngle - startAngle + origRotation;
     updateElement(id, { rotation: Math.round(rotation) });
   }
 
@@ -260,23 +307,24 @@ export function WorldEditor({ world, onBack }: WorldEditorProps) {
       className="flex h-full flex-col"
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
-      onClick={() => setSelectedId(null)}
+      // Clicking empty space deselects — but a click inside a dialog (React bubbles it through the portal) must not.
+      onClick={(e) => { if (!(e.target as HTMLElement).closest('[role=dialog]')) setSelectedId(null); }}
     >
       {/* Header */}
       <div className="flex items-center justify-between border-b border-white/5 px-4 py-3 md:px-6" style={{ background: ts.background.color2 + '60' }}>
         <div className="flex items-center gap-3">
-          <button onClick={onBack} className="rounded-lg p-2 text-[var(--text-secondary)] hover:bg-white/5">
-            <ArrowLeft size={18} />
+          <button onClick={() => { flushSaves(); onBack(); }} aria-label="Back to all worlds" className="rounded-lg p-2 text-[var(--text-secondary)] hover:bg-white/5">
+            <ArrowLeft size={18} aria-hidden="true" />
           </button>
           <div>
             <h1 className="font-display text-lg font-bold" style={{ color: ts.colors.textPrimary }}>{world.name}</h1>
-            {world.description && <p className="text-xs" style={{ color: ts.colors.textSecondary }}>{world.description}</p>}
+            {visibleWorldDescription(world.description) && <p className="text-xs" style={{ color: ts.colors.textSecondary }}>{visibleWorldDescription(world.description)}</p>}
           </div>
         </div>
         <div className="flex items-center gap-2">
           {!world.is_active && (
             <button
-              onClick={(e) => { e.stopPropagation(); activateWorld(world.id); toast.show('World activated.'); }}
+              onClick={async (e) => { e.stopPropagation(); if (await activateWorld(world.id)) toast.show('World activated.'); }}
               className="rounded-lg border border-white/10 px-3 py-1.5 text-xs font-medium text-[var(--text-primary)] hover:bg-white/5"
             >
               Set Active
@@ -311,6 +359,12 @@ export function WorldEditor({ world, onBack }: WorldEditorProps) {
           <div className="flex h-full items-center justify-center">
             <p className="text-sm" style={{ color: ts.colors.textSecondary }}>Loading...</p>
           </div>
+        ) : loadError ? (
+          <div role="alert" className="flex h-full flex-col items-center justify-center text-center">
+            <h2 className="mb-2 font-display text-xl font-bold" style={{ color: ts.colors.textPrimary }}>Couldn't open this board</h2>
+            <p className="mb-4 max-w-md text-sm" style={{ color: ts.colors.textSecondary }}>Its contents couldn't be loaded. Nothing has been lost.</p>
+            <button onClick={(e) => { e.stopPropagation(); setLoading(true); loadElements(); }} className="btn-primary px-5 py-2 text-sm">Try again</button>
+          </div>
         ) : elements.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center text-center">
             <h2 className="mb-2 font-display text-2xl font-bold" style={{ color: ts.colors.textPrimary }}>Build your world.</h2>
@@ -336,7 +390,7 @@ export function WorldEditor({ world, onBack }: WorldEditorProps) {
               onDragStart={startDrag}
               onResizeStart={startResize}
               onRotateStart={startRotate}
-              onUpdate={(updates) => { updateElement(el.id, updates); debouncedSave(el.id); }}
+              onEditText={() => { setSelectedId(el.id); setEditTextId(el.id); }}
             />
           ))
         )}
@@ -345,14 +399,19 @@ export function WorldEditor({ world, onBack }: WorldEditorProps) {
       {/* Selected element controls */}
       {selected && (
         <div className="flex items-center gap-1 border-t border-white/5 px-4 py-2" style={{ background: ts.background.color2 + '80' }}>
-          <button onClick={(e) => { e.stopPropagation(); duplicateElement(selected.id); }} className="rounded-lg p-2 text-[var(--text-secondary)] hover:bg-white/5" title="Duplicate">
-            <Copy size={16} />
+          {(selected.element_type === 'text' || selected.element_type === 'quote') && (
+            <button onClick={(e) => { e.stopPropagation(); setEditTextId(selected.id); }} className="rounded-lg px-3 py-2 text-xs font-medium text-[var(--text-secondary)] hover:bg-white/5" aria-label="Edit text">
+              Edit text
+            </button>
+          )}
+          <button onClick={(e) => { e.stopPropagation(); duplicateElement(selected.id); }} className="rounded-lg p-2 text-[var(--text-secondary)] hover:bg-white/5" title="Duplicate" aria-label="Duplicate element">
+            <Copy size={16} aria-hidden="true" />
           </button>
-          <button onClick={(e) => { e.stopPropagation(); bringForward(selected.id); }} className="rounded-lg p-2 text-[var(--text-secondary)] hover:bg-white/5" title="Bring forward">
-            <ChevronUp size={16} />
+          <button onClick={(e) => { e.stopPropagation(); bringForward(selected.id); }} className="rounded-lg p-2 text-[var(--text-secondary)] hover:bg-white/5" title="Bring forward" aria-label="Bring element forward">
+            <ChevronUp size={16} aria-hidden="true" />
           </button>
-          <button onClick={(e) => { e.stopPropagation(); sendBackward(selected.id); }} className="rounded-lg p-2 text-[var(--text-secondary)] hover:bg-white/5" title="Send backward">
-            <ChevronDown size={16} />
+          <button onClick={(e) => { e.stopPropagation(); sendBackward(selected.id); }} className="rounded-lg p-2 text-[var(--text-secondary)] hover:bg-white/5" title="Send backward" aria-label="Send element backward">
+            <ChevronDown size={16} aria-hidden="true" />
           </button>
           <div className="mx-2 h-5 w-px bg-white/10" />
           <label className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">
@@ -369,8 +428,8 @@ export function WorldEditor({ world, onBack }: WorldEditorProps) {
             />
           </label>
           <div className="mx-2 h-5 w-px bg-white/10" />
-          <button onClick={(e) => { e.stopPropagation(); setDeleteConfirm(true); }} className="rounded-lg p-2 text-rose-400 hover:bg-rose-500/10" title="Delete">
-            <Trash2 size={16} />
+          <button onClick={(e) => { e.stopPropagation(); setDeleteConfirm(true); }} className="rounded-lg p-2 text-rose-400 hover:bg-rose-500/10" title="Delete" aria-label="Delete element">
+            <Trash2 size={16} aria-hidden="true" />
           </button>
         </div>
       )}
@@ -380,24 +439,26 @@ export function WorldEditor({ world, onBack }: WorldEditorProps) {
         {toolbarActions.map((action) => {
           const Icon = action.icon;
           return (
-            <button key={action.label} onClick={() => {
+            <button key={action.label} aria-label={`Add ${action.label.toLowerCase()}`} onClick={() => {
               if (action.type === 'image' || action.type === 'text' || action.type === 'quote' || action.type === 'memory' || action.type === 'date' || action.type === 'music') {
                 setAddDialog(action.type);
               } else {
                 addElement(action.type as WorldElementType);
               }
             }}>
-              <Icon size={16} />
+              <Icon size={16} aria-hidden="true" />
               <span className="hidden sm:inline">{action.label}</span>
             </button>
           );
         })}
         <div className="mx-1 h-6 w-px bg-white/10" />
-        <button onClick={() => setShowAnalyze(true)}>
-          <Sparkles size={16} />
+        <button onClick={() => setShowAnalyze(true)} aria-label="Analyze this world">
+          <Sparkles size={16} aria-hidden="true" />
           <span className="hidden sm:inline">Analyze</span>
         </button>
-        <button onClick={() => setShowAppearance(true)}>
+        {/* This button had no icon, so on a phone (label hidden) it was an empty, invisible control. */}
+        <button onClick={() => setShowAppearance(true)} aria-label="Appearance">
+          <SlidersHorizontal size={16} aria-hidden="true" />
           <span className="hidden sm:inline">Appearance</span>
         </button>
       </div>
@@ -410,6 +471,19 @@ export function WorldEditor({ world, onBack }: WorldEditorProps) {
           onAdd={(props) => { addElement(addDialog, props); setAddDialog(null); }}
         />
       )}
+
+      {/* Edit text (replaces window.prompt, which is blocking, unstyled and unusable by double-tap on a phone) */}
+      {editTextId && (() => {
+        const el = elementsRef.current.find((x) => x.id === editTextId);
+        if (!el) return null;
+        return (
+          <EditTextDialog
+            element={el}
+            onClose={() => setEditTextId(null)}
+            onSave={(props) => { updateElement(el.id, { props: { ...el.props, ...props } }); debouncedSave(el.id); setEditTextId(null); }}
+          />
+        );
+      })()}
 
       {/* Appearance editor */}
       {showAppearance && (
@@ -455,10 +529,10 @@ interface MoodboardElementProps {
   onDragStart: (e: React.PointerEvent, el: WorldElement) => void;
   onResizeStart: (e: React.PointerEvent, el: WorldElement, handle: string) => void;
   onRotateStart: (e: React.PointerEvent, el: WorldElement) => void;
-  onUpdate: (updates: Partial<WorldElement>) => void;
+  onEditText: () => void;
 }
 
-function MoodboardElement({ element, themeSettings, selected, onSelect, onDragStart, onResizeStart, onRotateStart, onUpdate }: MoodboardElementProps) {
+function MoodboardElement({ element, themeSettings, selected, onSelect, onDragStart, onResizeStart, onRotateStart, onEditText }: MoodboardElementProps) {
   const ts = themeSettings;
   const p = element.props;
 
@@ -599,12 +673,10 @@ function MoodboardElement({ element, themeSettings, selected, onSelect, onDragSt
       className={`moodboard-element ${selected ? 'selected' : ''}`}
       style={style}
       onPointerDown={(e) => { onSelect(e); onDragStart(e, element); }}
-      onDoubleClick={() => {
-        if (element.element_type === 'text' || element.element_type === 'quote') {
-          const newText = window.prompt('Edit text:', (element.props.text as string) || '');
-          if (newText !== null) onUpdate({ props: { ...element.props, text: newText } });
-        }
-      }}
+      // The click that follows pointerdown used to bubble to the board's "click empty space → deselect" handler,
+      // so an element was selected and deselected in the same gesture and its controls never appeared.
+      onClick={(e) => e.stopPropagation()}
+      onDoubleClick={() => { if (element.element_type === 'text' || element.element_type === 'quote') onEditText(); }}
     >
       {content}
       {selected && (
@@ -621,6 +693,43 @@ function MoodboardElement({ element, themeSettings, selected, onSelect, onDragSt
 }
 
 // ============================================================
+// Edit text dialog
+// ============================================================
+
+function EditTextDialog({ element, onClose, onSave }: { element: WorldElement; onClose: () => void; onSave: (props: Record<string, unknown>) => void }) {
+  const isQuote = element.element_type === 'quote';
+  const [text, setText] = useState((element.props.text as string) || '');
+  const [author, setAuthor] = useState((element.props.author as string) || '');
+  return (
+    <Modal open={true} onClose={onClose} title={isQuote ? 'Edit Quote' : 'Edit Text'} maxWidth="480px">
+      <div className="space-y-4">
+        <textarea
+          aria-label={isQuote ? 'Quote' : 'Text'}
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          rows={isQuote ? 3 : 4}
+          className="w-full resize-none rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] focus:border-[var(--accent)]/50"
+        />
+        {isQuote && (
+          <input
+            aria-label="Author"
+            type="text"
+            value={author}
+            onChange={(e) => setAuthor(e.target.value)}
+            placeholder="Author (optional)"
+            className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] focus:border-[var(--accent)]/50"
+          />
+        )}
+        <div className="flex justify-end gap-3">
+          <button onClick={onClose} className="rounded-xl px-4 py-2 text-sm font-medium text-[var(--text-secondary)] hover:bg-white/5">Cancel</button>
+          <button onClick={() => onSave(isQuote ? { text, author } : { text })} className="btn-primary px-5 py-2 text-sm">Save</button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+// ============================================================
 // Add Element Dialog
 // ============================================================
 
@@ -630,6 +739,7 @@ function AddElementDialog({ type, onClose, onAdd }: { type: WorldElementType; on
   const [text, setText] = useState('');
   const [author, setAuthor] = useState('');
   const [color, setColor] = useState('#6366f1');
+  const [size, setSize] = useState(16);
   const [songTitle, setSongTitle] = useState('');
   const [artist, setArtist] = useState('');
   const [dateText, setDateText] = useState('');
@@ -642,7 +752,7 @@ function AddElementDialog({ type, onClose, onAdd }: { type: WorldElementType; on
 
   useEffect(() => {
     if (type === 'memory') {
-      supabase.from('memories').select('id, content, category').limit(20).then(({ data }) => {
+      supabase.from('memories').select('id, content, category').eq('status', 'active').order('created_at', { ascending: false }).limit(20).then(({ data }) => {
         setMemories((data as { id: string; content: string; category: string }[]) || []);
       });
     } else if (type === 'journal') {
@@ -707,7 +817,7 @@ function AddElementDialog({ type, onClose, onAdd }: { type: WorldElementType; on
             <div className="mt-3 flex gap-3">
               <div>
                 <label className="mb-1 block text-[10px] text-[var(--text-secondary)]">Size</label>
-                <input type="number" value={16} onChange={() => {}} className="w-16 rounded-lg border border-white/10 bg-white/[0.03] px-2 py-1 text-xs text-[var(--text-primary)]" />
+                <input type="number" min={8} max={96} value={size} onChange={(e) => setSize(Math.min(96, Math.max(8, Number(e.target.value) || 16)))} className="w-16 rounded-lg border border-white/10 bg-white/[0.03] px-2 py-1 text-xs text-[var(--text-primary)]" />
               </div>
               <div>
                 <label className="mb-1 block text-[10px] text-[var(--text-secondary)]">Color</label>
@@ -852,7 +962,7 @@ function AddElementDialog({ type, onClose, onAdd }: { type: WorldElementType; on
             <button onClick={onClose} className="rounded-xl px-4 py-2 text-sm font-medium text-[var(--text-secondary)] hover:bg-white/5">Cancel</button>
             <button
               onClick={() => {
-                if (type === 'text') onAdd({ text, color, size: 16, weight: 400, font: '', align: 'left' });
+                if (type === 'text') onAdd({ text, color, size, weight: 400, font: '', align: 'left' });
                 else if (type === 'quote') onAdd({ text, author, color, size: 18, font: '' });
                 else if (type === 'music') onAdd({ song_title: songTitle, artist, album_art: null });
                 else if (type === 'date') onAdd({ text: dateText || new Date().getDate().toString(), subtext: dateSubtext || new Date().toLocaleDateString('en-US', { month: 'long' }), color });

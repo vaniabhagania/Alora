@@ -13,5 +13,12 @@ export default {
       },
     },
   },
-  plugins: [],
+  plugins: [
+    // `hoverable:` applies only on devices with a real hover (mouse/trackpad). Row actions use
+    // `hoverable:opacity-0 hoverable:group-hover:opacity-100`, so on touch tablets (≥768px, which
+    // `md:` mistook for desktops) and for keyboard users (group-focus-within) they stay reachable.
+    function ({ addVariant }) {
+      addVariant('hoverable', '@media (hover: hover) and (pointer: fine)');
+    },
+  ],
 };

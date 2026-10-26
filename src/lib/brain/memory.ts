@@ -3,6 +3,7 @@ import { trackEvent } from './events';
 import type { ExtendedMemory, MemoryType, MemoryStatus } from './types';
 import type { MemoryCategory } from '@/lib/types';
 
+/** Loads memories. Throws on failure so callers can show an error state instead of an empty, misleading list. */
 export async function fetchMemories(
   status: MemoryStatus | 'all' = 'active',
 ): Promise<ExtendedMemory[]> {
@@ -11,30 +12,35 @@ export async function fetchMemories(
     query = query.eq('status', status);
   }
   const { data, error } = await query;
-  if (error) return [];
+  if (error) throw new Error(error.message);
   return (data as ExtendedMemory[]) || [];
 }
 
-export async function createMemory(input: {
+export interface NewMemoryInput {
   content: string;
   category: MemoryCategory;
   importance?: string;
   tags?: string[];
   memory_type?: MemoryType;
   confidence?: number;
+  /** Where it came from. Defaults to 'manual' (explicit) / 'ai_inferred' (inferred). */
+  source?: string;
   related_course_id?: string | null;
   related_goal_id?: string | null;
   related_identity_id?: string | null;
   related_journal_id?: string | null;
   evidence?: Record<string, unknown>[];
-}): Promise<ExtendedMemory | null> {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
+}
 
+/** Creates a memory. Returns the saved row, or null if it could not be saved (the reason is logged). */
+export async function createMemory(input: NewMemoryInput): Promise<ExtendedMemory | null> {
+  const content = input.content.trim();
+  if (!content) return null;
+
+  // user_id is filled by the column default (auth.uid()), so no extra auth round-trip is needed.
   const { data, error } = await supabase.from('memories').insert({
-    user_id: user.id,
-    content: input.content,
-    source: input.memory_type === 'inferred' ? 'ai_inferred' : 'manual',
+    content,
+    source: input.source ?? (input.memory_type === 'inferred' ? 'ai_inferred' : 'manual'),
     category: input.category,
     importance: input.importance || 'normal',
     tags: input.tags || [],
@@ -48,11 +54,15 @@ export async function createMemory(input: {
     evidence: input.evidence || [],
   }).select('*').maybeSingle();
 
-  if (error) return null;
+  if (error || !data) {
+    console.warn('[brain] could not create memory:', error?.message);
+    return null;
+  }
 
-  await trackEvent('memory_created', 'memory', data?.id, {
+  await trackEvent('memory_created', 'memory', data.id, {
     category: input.category,
     memory_type: input.memory_type || 'explicit',
+    source: input.source,
   });
 
   return data as ExtendedMemory;
@@ -60,58 +70,78 @@ export async function createMemory(input: {
 
 export async function updateMemory(
   id: string,
-  updates: Partial<Pick<ExtendedMemory, 'content' | 'importance' | 'status' | 'tags' | 'confidence'>>,
-): Promise<void> {
-  await supabase.from('memories').update({
+  updates: Partial<Pick<ExtendedMemory, 'content' | 'importance' | 'status' | 'tags' | 'confidence' | 'category'>>,
+): Promise<boolean> {
+  const { error } = await supabase.from('memories').update({
     ...updates,
     updated_at: new Date().toISOString(),
   }).eq('id', id);
+  if (error) { console.warn('[brain] could not update memory:', error.message); return false; }
 
   await trackEvent('memory_updated', 'memory', id, updates);
+  return true;
 }
 
-export async function correctMemory(id: string, newContent: string): Promise<void> {
-  await supabase.from('memories').update({
-    content: newContent,
+/** The user rewrote what Alora has on record: the new text becomes explicit, active and fully trusted. */
+export async function correctMemory(id: string, newContent: string): Promise<boolean> {
+  const content = newContent.trim();
+  if (!content) return false;
+  const { error } = await supabase.from('memories').update({
+    content,
     status: 'active',
+    memory_type: 'explicit',
+    confidence: 1.0,
     updated_at: new Date().toISOString(),
   }).eq('id', id);
+  if (error) { console.warn('[brain] could not correct memory:', error.message); return false; }
 
-  await trackEvent('memory_corrected', 'memory', id, { new_content: newContent });
+  await trackEvent('memory_corrected', 'memory', id, { new_content: content });
+  return true;
 }
 
-export async function deleteMemory(id: string): Promise<void> {
-  await supabase.from('memories').delete().eq('id', id);
+export async function deleteMemory(id: string): Promise<boolean> {
+  const { error } = await supabase.from('memories').delete().eq('id', id);
+  if (error) { console.warn('[brain] could not delete memory:', error.message); return false; }
+  return true;
 }
 
-export async function markMemoryImportant(id: string, importance: 'low' | 'normal' | 'high' | 'critical'): Promise<void> {
-  await supabase.from('memories').update({ importance }).eq('id', id);
+export async function markMemoryImportant(id: string, importance: 'low' | 'normal' | 'high' | 'critical'): Promise<boolean> {
+  const { error } = await supabase.from('memories').update({ importance, updated_at: new Date().toISOString() }).eq('id', id);
+  if (error) { console.warn('[brain] could not change importance:', error.message); return false; }
+  return true;
 }
 
-export async function dismissMemory(id: string): Promise<void> {
-  await supabase.from('memories').update({
+/** Hides a memory from Alora ("that's not right") without destroying it. */
+export async function dismissMemory(id: string): Promise<boolean> {
+  const { error } = await supabase.from('memories').update({
     status: 'dismissed',
     updated_at: new Date().toISOString(),
   }).eq('id', id);
+  if (error) { console.warn('[brain] could not dismiss memory:', error.message); return false; }
+  return true;
 }
 
-export async function reinforceMemory(id: string): Promise<void> {
-  const { data: memory } = await supabase
+export async function restoreMemory(id: string): Promise<boolean> {
+  return updateMemory(id, { status: 'active' });
+}
+
+export async function reinforceMemory(id: string): Promise<boolean> {
+  const { data: memory, error: readError } = await supabase
     .from('memories')
-    .select('*')
+    .select('recurrence_count, confidence')
     .eq('id', id)
     .maybeSingle();
-
-  if (!memory) return;
+  if (readError || !memory) return false;
 
   const newCount = (memory.recurrence_count || 0) + 1;
-  const newConfidence = Math.min(1.0, (memory.confidence || 0.5) + 0.1);
+  const newConfidence = Math.min(1.0, (Number(memory.confidence) || 0.5) + 0.1);
 
-  await supabase.from('memories').update({
+  const { error } = await supabase.from('memories').update({
     recurrence_count: newCount,
     confidence: newConfidence,
     last_reinforced: new Date().toISOString(),
   }).eq('id', id);
+  return !error;
 }
 
 export async function searchMemories(query: string, limit = 10): Promise<ExtendedMemory[]> {

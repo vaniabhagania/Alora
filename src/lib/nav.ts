@@ -3,22 +3,24 @@ import { Home, GraduationCap, Brain, CheckSquare, MessageSquare, BookOpen, Spark
 export interface NavItem {
   id: string;
   label: string;
+  /** Label for the phone bottom bar, where "Daily Quiz" → "Daily" and "My Future" → "My" were cut off. */
+  shortLabel: string;
   icon: LucideIcon;
 }
 
 export const NAV_ITEMS: NavItem[] = [
-  { id: 'home', label: 'Home', icon: Home },
-  { id: 'academia', label: 'Academia', icon: GraduationCap },
-  { id: 'quiz', label: 'Daily Quiz', icon: Brain },
-  { id: 'tasks', label: 'Tasks', icon: CheckSquare },
-  { id: 'routines', label: 'Routines', icon: CalendarClock },
-  { id: 'chat', label: 'Alora Chat', icon: MessageSquare },
-  { id: 'journal', label: 'Journal', icon: BookOpen },
-  { id: 'future', label: 'My Future', icon: Sparkles },
-  { id: 'novel', label: 'Novel', icon: BookA },
-  { id: 'memory', label: 'Memory', icon: Database },
-  { id: 'worlds', label: 'Vibe', icon: Globe },
-  { id: 'settings', label: 'Settings', icon: Settings },
+  { id: 'home', label: 'Home', shortLabel: 'Home', icon: Home },
+  { id: 'academia', label: 'Academia', shortLabel: 'Academia', icon: GraduationCap },
+  { id: 'quiz', label: 'Daily Quiz', shortLabel: 'Quiz', icon: Brain },
+  { id: 'tasks', label: 'Tasks', shortLabel: 'Tasks', icon: CheckSquare },
+  { id: 'routines', label: 'Routines', shortLabel: 'Routines', icon: CalendarClock },
+  { id: 'chat', label: 'Alora Chat', shortLabel: 'Chat', icon: MessageSquare },
+  { id: 'journal', label: 'Journal', shortLabel: 'Journal', icon: BookOpen },
+  { id: 'future', label: 'My Future', shortLabel: 'Future', icon: Sparkles },
+  { id: 'novel', label: 'Novel', shortLabel: 'Novel', icon: BookA },
+  { id: 'memory', label: 'Memory', shortLabel: 'Memory', icon: Database },
+  { id: 'worlds', label: 'Vibe', shortLabel: 'Vibe', icon: Globe },
+  { id: 'settings', label: 'Settings', shortLabel: 'Settings', icon: Settings },
 ];
 
 const HIDE_WORDS = /\b(hide|remove|delete|get rid of|don'?t need|turn off)\b/i;

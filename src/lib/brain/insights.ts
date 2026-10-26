@@ -1,6 +1,5 @@
 import { supabase } from '@/lib/supabase';
 import type { StudentContext, InsightRecord, EvidenceItem } from './types';
-import { trackEvent } from './events';
 
 export async function generateInsights(
   ctx: StudentContext,
@@ -247,27 +246,32 @@ function avgScore(attempts: { correct_count: number; total_questions: number }[]
   return attempts.reduce((sum, a) => sum + (a.total_questions > 0 ? (a.correct_count / a.total_questions) * 100 : 0), 0) / attempts.length;
 }
 
-export async function saveInsights(insights: InsightRecord[]): Promise<void> {
-  if (insights.length === 0) return;
-
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return;
-
+/** Stores new insights. Resolves false (and logs) if they could not be saved; `user_id` is filled in by the table default. */
+export async function saveInsights(insights: InsightRecord[]): Promise<boolean> {
+  if (insights.length === 0) return true;
   const rows = insights.map((i) => ({
-    user_id: user.id,
     insight_type: i.insight_type,
     title: i.title,
     description: i.description,
     evidence: i.evidence,
     severity: i.severity,
   }));
-
-  await supabase.from('insights').insert(rows);
-  await trackEvent('memory_created', 'insight', null, { count: insights.length });
+  const { error } = await supabase.from('insights').insert(rows);
+  if (error) {
+    console.warn('[brain] could not save insights:', error.message);
+    return false;
+  }
+  return true;
 }
 
-export async function dismissInsight(insightId: string): Promise<void> {
-  await supabase.from('insights').update({ is_dismissed: true }).eq('id', insightId);
+/** Hides an insight. Resolves false if the change did not reach the database, so the UI can roll back. */
+export async function dismissInsight(insightId: string): Promise<boolean> {
+  const { error } = await supabase.from('insights').update({ is_dismissed: true }).eq('id', insightId);
+  if (error) {
+    console.warn('[brain] could not dismiss insight:', error.message);
+    return false;
+  }
+  return true;
 }
 
 export async function getActiveInsights(): Promise<InsightRecord[]> {
@@ -280,6 +284,75 @@ export async function getActiveInsights(): Promise<InsightRecord[]> {
 
   if (error) return [];
   return (data as InsightRecord[]) || [];
+}
+
+const INSIGHT_REFRESH_MS = 6 * 60 * 60 * 1000;
+const INSIGHT_MEMORY_DAYS = 7;
+
+function checkedKey(userId: string) { return `alora.insights.checkedAt.${userId}`; }
+function lastChecked(userId: string): number {
+  try { return Number(localStorage.getItem(checkedKey(userId))) || 0; } catch { return 0; }
+}
+function markChecked(userId: string) {
+  try { localStorage.setItem(checkedKey(userId), String(Date.now())); } catch { /* storage unavailable: we just re-check next visit */ }
+}
+
+/**
+ * Returns the insights to show, regenerating them (at most every 6 hours) from the unified student context.
+ *
+ *  - Anything the student dismissed stays dismissed: a candidate whose title matches ANY insight from the last
+ *    week — dismissed or not — is not saved again. (It used to reappear the moment the last one was dismissed.)
+ *  - Insights that no longer hold (the overdue tasks were done, the quiz average recovered) are retired instead
+ *    of lingering until someone dismisses them.
+ *
+ * Throws if the insights table can't be read, so the caller can show an error instead of "no insights".
+ */
+export function refreshInsights(
+  userId: string,
+  loadContext: () => Promise<StudentContext>,
+  options: { force?: boolean } = {},
+): Promise<InsightRecord[]> {
+  // React runs mount effects twice in development, and two tabs/pages can ask at once: share one run so the same
+  // insight is never saved twice.
+  const running = inflightRefresh.get(userId);
+  if (running) return running;
+  const run = doRefreshInsights(userId, loadContext, options).finally(() => inflightRefresh.delete(userId));
+  inflightRefresh.set(userId, run);
+  return run;
+}
+
+const inflightRefresh = new Map<string, Promise<InsightRecord[]>>();
+
+async function doRefreshInsights(
+  userId: string,
+  loadContext: () => Promise<StudentContext>,
+  options: { force?: boolean },
+): Promise<InsightRecord[]> {
+  const since = new Date(Date.now() - INSIGHT_MEMORY_DAYS * 24 * 60 * 60 * 1000).toISOString();
+  const { data, error } = await supabase
+    .from('insights').select('*').gte('created_at', since).order('created_at', { ascending: false }).limit(60);
+  if (error) throw new Error(error.message);
+  const recent = (data as InsightRecord[]) || [];
+  const active = recent.filter((i) => !i.is_dismissed);
+
+  if (!options.force && Date.now() - lastChecked(userId) < INSIGHT_REFRESH_MS) return active.slice(0, 10);
+
+  const ctx = await loadContext();
+  if (ctx.loadErrors.length > 0) return active.slice(0, 10); // judging from a partial picture would retire good insights
+
+  const candidates = await generateInsights(ctx);
+  const known = new Set(recent.map((i) => i.title));
+  const stillTrue = new Set(candidates.map((c) => c.title));
+
+  const stale = active.filter((i) => !stillTrue.has(i.title));
+  if (stale.length > 0) {
+    await supabase.from('insights').update({ is_dismissed: true }).in('id', stale.map((i) => i.id));
+  }
+  const fresh = candidates.filter((c) => !known.has(c.title));
+  const saved = await saveInsights(fresh);
+  if (saved) markChecked(userId);
+
+  return getActiveInsights();
 }
 
 export function buildExplainableRecommendation(

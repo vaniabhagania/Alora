@@ -14,17 +14,26 @@ function makeTopic(overrides: Partial<Topic> = {}): Topic {
 }
 
 let topicsToReturn: Topic[] = [];
+let modulesToReturn: { id: string }[] = [];
+const filtersSeen: { table: string; op: string; args: unknown[] }[] = [];
+
+/** A chainable, awaitable stand-in for a PostgREST query builder. */
+function builder(table: string, result: () => unknown) {
+  const b: Record<string, unknown> = {};
+  for (const op of ['select', 'ilike', 'eq', 'in', 'limit', 'order']) {
+    b[op] = (...args: unknown[]) => { filtersSeen.push({ table, op, args }); return b; };
+  }
+  b.maybeSingle = async () => ({ data: (result() as unknown[])[0] ?? null, error: null });
+  b.then = (resolve: (v: unknown) => unknown) => resolve({ data: result(), error: null });
+  return b;
+}
 
 vi.mock('@/lib/supabase', () => ({
   supabase: {
     from: (table: string) => {
       if (table === 'topics') {
         return {
-          select: () => ({
-            ilike: () => ({
-              limit: async () => ({ data: topicsToReturn }),
-            }),
-          }),
+          ...builder('topics', () => topicsToReturn),
           update: (payload: Record<string, unknown>) => ({
             eq: async (_col: string, id: string) => {
               updateCalls.push({ id, payload });
@@ -33,7 +42,8 @@ vi.mock('@/lib/supabase', () => ({
           }),
         };
       }
-      return { select: () => ({ ilike: () => ({ limit: async () => ({ data: [] }) }) }) };
+      if (table === 'modules') return builder('modules', () => modulesToReturn);
+      return builder(table, () => []);
     },
   },
 }));
@@ -44,7 +54,9 @@ const { cascadeQuizResults } = await import('./cascade');
 
 beforeEach(() => {
   updateCalls.length = 0;
+  filtersSeen.length = 0;
   topicsToReturn = [];
+  modulesToReturn = [];
 });
 
 describe('cascadeQuizResults — mistake tracking (B4)', () => {
@@ -115,5 +127,40 @@ describe('cascadeQuizResults — mistake tracking (B4)', () => {
 
     const mistakes = updateCalls[0].payload.mistakes as string[];
     expect(mistakes).toHaveLength(0);
+  });
+});
+
+
+describe('cascadeQuizResults — which topic gets updated', () => {
+  const missed = [{ topic: 'Limits', question: 'Q?', is_correct: false, correct_answer: 'a', user_answer: 'b' }];
+
+  it('prefers an explicit topic id over matching by name', async () => {
+    topicsToReturn = [makeTopic({ id: 'exact', name: 'Limits' })];
+    const summary = await cascadeQuizResults('quiz-1', [{ ...missed[0], topic_id: 'exact' }], null);
+    expect(summary.topicsUpdated).toBe(1);
+    expect(updateCalls.map((c) => c.id)).toEqual(['exact']);
+    expect(filtersSeen.some((f) => f.table === 'topics' && f.op === 'ilike')).toBe(false);
+  });
+
+  it('scopes a name match to the quiz course so same-named topics elsewhere are untouched', async () => {
+    modulesToReturn = [{ id: 'calc-module' }];
+    topicsToReturn = [makeTopic({ id: 'calc-limits', name: 'Limits' })];
+    await cascadeQuizResults('quiz-1', missed, 'course-calc');
+    expect(filtersSeen.find((f) => f.table === 'modules' && f.op === 'eq')?.args).toEqual(['course_id', 'course-calc']);
+    expect(filtersSeen.find((f) => f.table === 'topics' && f.op === 'in')?.args).toEqual(['module_id', ['calc-module']]);
+    expect(updateCalls.map((c) => c.id)).toEqual(['calc-limits']);
+  });
+
+  it('refuses to guess when a name matches several topics and there is no course to disambiguate', async () => {
+    topicsToReturn = [makeTopic({ id: 'a', name: 'Limits' }), makeTopic({ id: 'b', name: 'Limits' })];
+    const summary = await cascadeQuizResults('quiz-1', missed, null);
+    expect(updateCalls).toHaveLength(0);
+    expect(summary.skipped).toEqual(['Limits']);
+  });
+
+  it('escapes LIKE wildcards in topic names', async () => {
+    topicsToReturn = [makeTopic({ name: '100% rule' })];
+    await cascadeQuizResults('quiz-1', [{ ...missed[0], topic: '100% rule' }], null);
+    expect(filtersSeen.find((f) => f.op === 'ilike')?.args).toEqual(['name', '100\\% rule']);
   });
 });
