@@ -10,7 +10,7 @@ function emptyContext(): StudentContext {
     habits: [], journalEntries: [], memories: [], activityEvents: [],
     insights: [], streak: 0, quizAverage: 0, overdueTasks: [],
     upcomingTasks: [], todayTasks: [], weakTopics: [], strongTopics: [],
-    activeGoals: [], completedTasksThisWeek: 0, totalTasksThisWeek: 0,
+    activeGoals: [], completedTasksThisWeek: 0, totalTasksThisWeek: 0, loadErrors: [],
   };
 }
 

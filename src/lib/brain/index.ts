@@ -13,18 +13,18 @@ export {
 } from './events';
 
 export {
-  generateInsights, saveInsights, dismissInsight, getActiveInsights,
+  generateInsights, saveInsights, dismissInsight, getActiveInsights, refreshInsights,
   buildExplainableRecommendation,
 } from './insights';
 
 export {
-  cascadeQuizResults, cascadeTaskCompletion, cascadeTaskCreation,
-  cascadeGoalProgress, cascadeHabitCompletion, cascadeJournalToMemory,
-  cascadeWorldPreference,
+  cascadeQuizResults, cascadeTaskCompletion, cascadeTaskStatusChange, cascadeTaskCreation, cascadeTaskDeletion,
+  recomputeLinkedProgress, cascadeGoalProgress, cascadeHabitCompletion, cascadeHabitUndo,
+  cascadeJournalToMemory, cascadeWorldPreference, cascadeWorldActivated, cascadeClassLog, cascadeClassEdit, cascadeClassDeletion, buildClassMemoryContent, cascadeNovelSceneSaved,
 } from './cascade';
 
 export {
   fetchMemories, createMemory, updateMemory, correctMemory,
-  deleteMemory, markMemoryImportant, dismissMemory, reinforceMemory,
+  deleteMemory, markMemoryImportant, dismissMemory, restoreMemory, reinforceMemory,
   searchMemories, getMemoryTypeLabel, getMemoryTypeColor,
 } from './memory';

@@ -6,9 +6,11 @@ import type { Topic, TopicStatus } from '@/lib/types';
 import { EmptyState, ProgressBar, PopoverMenu } from '@/components/ui';
 import { ConfirmModal } from '@/components/Modal';
 import {
-  CreateEntityModal, EditEntityModal, DeleteConfirmModal, levelTable, countDeps,
-  type Level, type EditModalData, type DeleteTarget, LogClassModal,
+  CreateEntityModal, EditEntityModal, DeleteConfirmModal,
+  type EditModalData, type DeleteTarget, LogClassModal,
 } from '@/components/academia/AcademiaHierarchy';
+import { levelTable, countDeps, classIdsUnder, type Level } from '@/components/academia/hierarchy';
+import { cascadeClassDeletion } from '@/lib/brain';
 import { AttachmentList } from '@/components/AttachmentList';
 import { AskAlora } from '@/components/AskAlora';
 import { ArrowLeft, BookOpen, FileText, Brain, Clock, AlertTriangle, TrendingUp, GraduationCap, CheckCircle2, Plus, Pencil, Trash2 } from 'lucide-react';
@@ -40,6 +42,7 @@ export function CourseView({ courseId, data, onBack, reload }: Props) {
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
   const [deleteClassTarget, setDeleteClassTarget] = useState<string | null>(null);
   const [logClassModal, setLogClassModal] = useState(false);
+  const [editClass, setEditClass] = useState<string | null>(null);
   const [topicModuleId, setTopicModuleId] = useState('');
   const toast = useToast();
 
@@ -81,7 +84,7 @@ export function CourseView({ courseId, data, onBack, reload }: Props) {
       <div className="glass-card mb-6 p-5">
         <div className="flex items-start gap-4">
           <div className="h-12 w-12 shrink-0 rounded-xl" style={{ background: course.color }} />
-          <div className="flex-1">
+          <div className="min-w-0 flex-1">
             <h2 className="font-display text-xl font-bold text-[var(--text-primary)]">{course.name}</h2>
             <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-[var(--text-secondary)]">
               {course.course_code && <span>{course.course_code}</span>}
@@ -89,6 +92,10 @@ export function CourseView({ courseId, data, onBack, reload }: Props) {
               {course.professor && <span>· {course.professor}</span>}
             </div>
           </div>
+          <PopoverMenu label={`Actions for ${course.name}`} items={[
+            { icon: <Pencil size={14} />, label: 'Edit Course', onClick: () => setEditModal({ level: 'course', id: course.id, name: course.name, description: course.description, professor: course.professor, code: course.course_code, color: course.color, semesterId: course.semester_id }) },
+            { icon: <Trash2 size={14} />, label: 'Delete Course', onClick: () => setDeleteTarget({ id: course.id, level: 'course', label: course.name, deps: countDeps(data, 'course', course.id) }), danger: true },
+          ]} />
         </div>
         {course.description && <p className="mt-3 text-sm text-[var(--text-secondary)]">{course.description}</p>}
       </div>
@@ -167,7 +174,7 @@ export function CourseView({ courseId, data, onBack, reload }: Props) {
                     {mod.description && <p className="mt-1 text-xs text-[var(--text-secondary)]">{mod.description}</p>}
                     <p className="mt-2 text-xs text-[var(--text-secondary)]">{modTopics.length} topics</p>
                   </div>
-                  <PopoverMenu items={[
+                  <PopoverMenu label={`Actions for ${mod.name}`} items={[
                     { icon: <Pencil size={14} />, label: 'Edit', onClick: () => setEditModal({ level: 'module', id: mod.id, name: mod.name, description: mod.description || '' }) },
                     { icon: <Trash2 size={14} />, label: 'Delete', onClick: () => setDeleteTarget({ id: mod.id, level: 'module', label: mod.name, deps: countDeps(data, 'module', mod.id) }), danger: true },
                   ]} />
@@ -216,7 +223,10 @@ export function CourseView({ courseId, data, onBack, reload }: Props) {
               <div key={c.id} className="glass-card p-4">
                 <div className="flex items-start justify-between">
                   <p className="text-sm font-medium text-[var(--text-primary)]">{c.title}</p>
-                  <button onClick={() => setDeleteClassTarget(c.id)} className="rounded-lg p-1.5 text-[var(--text-secondary)] hover:bg-rose-500/10 hover:text-rose-400"><Trash2 size={14} /></button>
+                  <div className="flex shrink-0 items-center">
+                    <button onClick={() => setEditClass(c.id)} aria-label={`Edit class: ${c.title}`} className="rounded-lg p-1.5 text-[var(--text-secondary)] hover:bg-ink/5 hover:text-[var(--text-primary)]"><Pencil size={14} /></button>
+                    <button onClick={() => setDeleteClassTarget(c.id)} aria-label={`Delete class: ${c.title}`} className="rounded-lg p-1.5 text-[var(--text-secondary)] hover:bg-rose-500/10 hover:text-rose-400"><Trash2 size={14} /></button>
+                  </div>
                 </div>
                 <p className="text-xs text-[var(--text-secondary)]">{new Date(c.session_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}{topic ? ` · ${topic.name}` : ''}{log ? ` · Understanding: ${log.understanding_rating}/5` : ''}</p>
                 {log && log.raw_thoughts && <p className="mt-2 rounded-lg border border-ink/8 bg-ink/[0.02] px-3 py-2 text-xs text-[var(--text-secondary)]">{log.raw_thoughts}</p>}
@@ -290,6 +300,17 @@ export function CourseView({ courseId, data, onBack, reload }: Props) {
         <LogClassModal courses={data.courses} modules={data.modules} topics={data.topics} defaultCourseId={course.id} onClose={() => setLogClassModal(false)} onLogged={() => { setLogClassModal(false); reload(); }} />
       )}
 
+      {editClass && (() => {
+        const cls = data.classes.find((c) => c.id === editClass);
+        return cls ? (
+          <LogClassModal
+            courses={data.courses} modules={data.modules} topics={data.topics}
+            editing={{ cls, log: data.classLogs.find((l) => l.class_id === cls.id) || null }}
+            onClose={() => setEditClass(null)} onLogged={() => { setEditClass(null); reload(); }}
+          />
+        ) : null;
+      })()}
+
       {editModal && (
         <EditEntityModal data={editModal} allData={data} onClose={() => setEditModal(null)} onSaved={() => { setEditModal(null); reload(); }} />
       )}
@@ -299,8 +320,10 @@ export function CourseView({ courseId, data, onBack, reload }: Props) {
           target={deleteTarget}
           onClose={() => setDeleteTarget(null)}
           onConfirm={async () => {
+            const doomedClasses = classIdsUnder(data, deleteTarget.level, deleteTarget.id);
             const { error } = await supabase.from(levelTable(deleteTarget.level)).delete().eq('id', deleteTarget.id);
-            if (error) toast.show('Failed to delete.', 'error'); else { toast.show('Deleted permanently.'); reload(); }
+            const deletedThisCourse = deleteTarget.level === 'course' && deleteTarget.id === course.id;
+            if (error) toast.show('Failed to delete.', 'error'); else { await cascadeClassDeletion(doomedClasses); toast.show('Deleted permanently.'); reload(); if (deletedThisCourse) onBack(); }
             setDeleteTarget(null);
           }}
           onArchive={async () => {
@@ -316,7 +339,7 @@ export function CourseView({ courseId, data, onBack, reload }: Props) {
         onClose={() => setDeleteClassTarget(null)}
         onConfirm={async () => {
           const { error } = await supabase.from('classes').delete().eq('id', deleteClassTarget);
-          if (error) toast.show('Failed to delete.', 'error'); else { toast.show('Class deleted.'); reload(); }
+          if (error) toast.show('Failed to delete.', 'error'); else { if (deleteClassTarget) await cascadeClassDeletion(deleteClassTarget); toast.show('Class deleted.'); reload(); }
           setDeleteClassTarget(null);
         }}
         title="Delete Class"
@@ -359,7 +382,7 @@ function TopicRow({ topic, reload, onEdit, onDelete }: { topic: Topic; reload: (
         </div>
         <div className="flex items-center gap-1">
           <button onClick={() => setEditing(!editing)} className="text-xs text-[var(--accent-secondary)] hover:underline">{editing ? 'Cancel' : 'Update Progress'}</button>
-          <PopoverMenu items={[
+          <PopoverMenu label={`Actions for ${topic.name}`} items={[
             { icon: <Pencil size={14} />, label: 'Rename / Edit', onClick: onEdit },
             { icon: <Trash2 size={14} />, label: 'Delete', onClick: onDelete, danger: true },
           ]} />

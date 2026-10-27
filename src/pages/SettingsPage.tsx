@@ -6,7 +6,10 @@ import { useSettings } from '@/lib/settingsContext';
 import { supabase } from '@/lib/supabase';
 import { NAV_ITEMS } from '@/lib/nav';
 import { runSystemHealthCheck, type SystemHealthReport } from '@/lib/systemHealth';
-import { Globe, User, Bell, Brain, Download, Shield, LogOut, ArrowRight, LayoutGrid, Sun, Moon, Activity, CheckCircle2, XCircle, AlertTriangle } from 'lucide-react';
+import { collectUserData, downloadJson } from '@/lib/exportData';
+import { DEFAULT_QUIZ_MIX, QUIZ_MIX_LABELS, type QuizMix } from '@/lib/quizMix';
+import { Toggle } from '@/components/ui';
+import { Globe, User, Bell, Brain, Download, Shield, LogOut, ArrowRight, LayoutGrid, Sun, Moon, Activity, CheckCircle2, XCircle, AlertTriangle, SlidersHorizontal } from 'lucide-react';
 
 interface SettingsPageProps {
   onNavigate: (page: string) => void;
@@ -15,16 +18,19 @@ interface SettingsPageProps {
 export function SettingsPage({ onNavigate }: SettingsPageProps) {
   const { profile, refreshProfile, signOut } = useAuth();
   const { activeWorld, worlds, deactivateWorld } = useWorlds();
-  const { hiddenNavItems, toggleNavItem, themeMode, setThemeMode } = useSettings();
+  const { hiddenNavItems, toggleNavItem, themeMode, setThemeMode, notificationsEnabled, setNotificationsEnabled, quizMix, setQuizMix } = useSettings();
   const toast = useToast();
   const [displayName, setDisplayName] = useState(profile?.display_name || '');
   const [phase, setPhase] = useState(profile?.current_phase || '');
-  const [notifications, setNotifications] = useState(true);
   const [saving, setSaving] = useState(false);
   const [customInstructions, setCustomInstructions] = useState('');
   const [savingInstructions, setSavingInstructions] = useState(false);
   const [healthReport, setHealthReport] = useState<SystemHealthReport | null>(null);
   const [checkingHealth, setCheckingHealth] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [draftMix, setDraftMix] = useState<QuizMix>(quizMix);
+  const [instructionsLoaded, setInstructionsLoaded] = useState(false);
+  useEffect(() => { setDraftMix(quizMix); }, [quizMix]);
 
   const moodboardAutomationPrefs = (profile?.preferences.moodboardAutomation ?? {}) as { enabled?: boolean; lastGeneratedMonth?: string; lastObsession?: string };
   const moodboardAutomationEnabled = moodboardAutomationPrefs.enabled !== false;
@@ -34,9 +40,10 @@ export function SettingsPage({ onNavigate }: SettingsPageProps) {
 
   async function toggleMoodboardAutomation(enabled: boolean) {
     if (!profile) return;
-    await supabase.from('alora_profiles').update({
+    const { error } = await supabase.from('alora_profiles').update({
       preferences: { ...profile.preferences, moodboardAutomation: { ...moodboardAutomationPrefs, enabled } },
     }).eq('id', profile.id);
+    if (error) { toast.show('Could not update the moodboard setting. Try again.', 'error'); return; }
     await refreshProfile();
     toast.show(enabled ? 'Monthly moodboard automation enabled.' : 'Monthly moodboard automation disabled.');
   }
@@ -49,10 +56,17 @@ export function SettingsPage({ onNavigate }: SettingsPageProps) {
   useEffect(() => {
     if (!profile?.user_id) return;
     supabase.from('settings').select('custom_chat_instructions').eq('user_id', profile.user_id).maybeSingle()
-      .then(({ data }) => setCustomInstructions(data?.custom_chat_instructions || ''));
+      .then(({ data, error }) => {
+        if (error) { toast.show("Couldn't load your custom instructions.", 'error'); return; }
+        setCustomInstructions(data?.custom_chat_instructions || '');
+        setInstructionsLoaded(true);
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile?.user_id]);
 
   async function saveCustomInstructions() {
+    // Never overwrite stored instructions with an empty box that simply failed to load.
+    if (!instructionsLoaded) { toast.show('Still loading your instructions — try again in a moment.', 'error'); return; }
     setSavingInstructions(true);
     const { error } = await supabase
       .from('settings')
@@ -78,20 +92,38 @@ export function SettingsPage({ onNavigate }: SettingsPageProps) {
   }
 
   async function exportData() {
-    const tables = ['alora_profiles', 'academic_years', 'semesters', 'courses', 'modules', 'topics', 'classes', 'class_logs', 'tasks', 'quizzes', 'quiz_questions', 'quiz_attempts', 'memories', 'journal_entries', 'goals', 'identities', 'habits', 'future_self_profiles', 'novel_projects', 'novel_chapters', 'novel_scenes', 'themes', 'worlds', 'world_elements', 'world_music'];
-    const result: Record<string, unknown> = {};
-    for (const table of tables) {
-      const { data } = await supabase.from(table).select('*');
-      result[table] = data || [];
+    setExporting(true);
+    try {
+      const result = await collectUserData();
+      const stamp = new Date().toISOString().split('T')[0];
+      if (result.failed.length > 0) {
+        // Never hand over a partial export as if it were complete.
+        downloadJson(result, `alora-export-INCOMPLETE-${stamp}.json`);
+        toast.show(`Export is incomplete — could not read: ${result.failed.map((f) => f.table).join(', ')}.`, 'error');
+      } else {
+        downloadJson(result, `alora-export-${stamp}.json`);
+        const total = Object.values(result.counts).reduce((a, b) => a + b, 0);
+        toast.show(`Exported ${total} records across ${Object.keys(result.counts).length} tables.`);
+      }
+    } catch (e) {
+      toast.show(`Export failed: ${e instanceof Error ? e.message : 'unknown error'}`, 'error');
+    } finally {
+      setExporting(false);
     }
-    const blob = new Blob([JSON.stringify(result, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `alora-export-${new Date().toISOString().split('T')[0]}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-    toast.show('Your data has been exported.');
+  }
+
+  async function toggleNav(id: string, visible: boolean) {
+    if (!(await toggleNavItem(id, visible))) toast.show("Couldn't save that change. Check your connection.", 'error');
+  }
+  async function changeTheme(mode: 'light' | 'dark') {
+    if (!(await setThemeMode(mode))) toast.show("Couldn't save your theme — it will reset on reload.", 'error');
+  }
+  async function changeNotifications(on: boolean) {
+    if (!(await setNotificationsEnabled(on))) toast.show("Couldn't save that change. Check your connection.", 'error');
+  }
+  async function saveQuizMix() {
+    if (await setQuizMix(draftMix)) toast.show('Quiz mix saved. Your next daily quiz will use it.');
+    else toast.show("Couldn't save the quiz mix.", 'error');
   }
 
   return (
@@ -104,7 +136,7 @@ export function SettingsPage({ onNavigate }: SettingsPageProps) {
         <p className="mb-4 text-sm text-[var(--text-secondary)]">Every color and border in Alora adjusts for contrast automatically. This only applies when you're not in a custom Vibe.</p>
         <div className="flex gap-2 rounded-xl bg-ink/[0.03] p-1">
           <button
-            onClick={() => setThemeMode('light')}
+            onClick={() => changeTheme('light')} aria-pressed={themeMode === 'light'}
             className={`flex flex-1 items-center justify-center gap-2 rounded-lg py-2 text-sm font-medium transition-all ${
               themeMode === 'light' ? 'bg-[var(--accent)]/20 text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'
             }`}
@@ -112,7 +144,7 @@ export function SettingsPage({ onNavigate }: SettingsPageProps) {
             <Sun size={16} /> Light
           </button>
           <button
-            onClick={() => setThemeMode('dark')}
+            onClick={() => changeTheme('dark')} aria-pressed={themeMode === 'dark'}
             className={`flex flex-1 items-center justify-center gap-2 rounded-lg py-2 text-sm font-medium transition-all ${
               themeMode === 'dark' ? 'bg-[var(--accent)]/20 text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'
             }`}
@@ -125,8 +157,8 @@ export function SettingsPage({ onNavigate }: SettingsPageProps) {
       <section className="glass-card mb-4 p-5">
         <div className="mb-4 flex items-center gap-3"><User size={18} className="text-[var(--accent-secondary)]" /><h2 className="font-display font-semibold text-[var(--text-primary)]">Profile</h2></div>
         <div className="space-y-4">
-          <div><label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Display Name</label><input value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="Your name" className="w-full rounded-xl border border-ink/10 bg-ink/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50" /></div>
-          <div><label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Current Academic Phase</label><input value={phase} onChange={(e) => setPhase(e.target.value)} placeholder="e.g. Year 2 · Semester 1" className="w-full rounded-xl border border-ink/10 bg-ink/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50" /></div>
+          <div><label htmlFor="settings-display-name" className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Display Name</label><input id="settings-display-name" value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="Your name" className="w-full rounded-xl border border-ink/10 bg-ink/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50" /></div>
+          <div><label htmlFor="settings-phase" className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Current Academic Phase</label><input id="settings-phase" value={phase} onChange={(e) => setPhase(e.target.value)} placeholder="e.g. Year 2 · Semester 1" className="w-full rounded-xl border border-ink/10 bg-ink/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50" /></div>
           <button onClick={saveProfile} disabled={saving} className="btn-primary px-4 py-2 text-sm">{saving ? 'Saving...' : 'Save Profile'}</button>
         </div>
       </section>
@@ -144,7 +176,7 @@ export function SettingsPage({ onNavigate }: SettingsPageProps) {
               </div>
             </div>
             <button
-              onClick={() => { deactivateWorld(); toast.show('Vibe disabled. Back to default appearance.'); }}
+              onClick={async () => { if (await deactivateWorld()) toast.show('Vibe disabled. Back to default appearance.'); }}
               className="rounded-full bg-[var(--accent)]/15 px-2.5 py-1 text-xs font-medium text-[var(--accent-secondary)] hover:bg-[var(--accent)]/25"
             >
               Active · Disable
@@ -164,12 +196,7 @@ export function SettingsPage({ onNavigate }: SettingsPageProps) {
               {moodboardAutomationLastRun && ` Last run: ${moodboardAutomationLastRun}.`}
             </p>
           </div>
-          <button
-            onClick={() => toggleMoodboardAutomation(!moodboardAutomationEnabled)}
-            className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${moodboardAutomationEnabled ? 'bg-[var(--accent)]' : 'bg-ink/10'}`}
-          >
-            <span className={`absolute top-1 h-4 w-4 rounded-full bg-white transition-transform ${moodboardAutomationEnabled ? 'left-6' : 'left-1'}`} />
-          </button>
+          <Toggle checked={moodboardAutomationEnabled} onChange={toggleMoodboardAutomation} label="Auto-generate a monthly moodboard" />
         </div>
       </section>
 
@@ -181,37 +208,67 @@ export function SettingsPage({ onNavigate }: SettingsPageProps) {
             const Icon = item.icon;
             const visible = !hiddenNavItems.includes(item.id);
             return (
-              <label key={item.id} className="flex items-center justify-between rounded-xl px-2 py-2 hover:bg-ink/[0.02]">
+              <div key={item.id} className="flex items-center justify-between rounded-xl px-2 py-2 hover:bg-ink/[0.02]">
                 <span className="flex items-center gap-2.5 text-sm text-[var(--text-primary)]">
                   <Icon size={16} className="text-[var(--text-secondary)]" /> {item.label}
                 </span>
-                <button
-                  onClick={() => toggleNavItem(item.id, !visible)}
-                  className={`relative h-6 w-11 rounded-full transition-colors ${visible ? 'bg-[var(--accent)]' : 'bg-ink/10'}`}
-                >
-                  <span className={`absolute top-1 h-4 w-4 rounded-full bg-white transition-transform ${visible ? 'left-6' : 'left-1'}`} />
-                </button>
-              </label>
+                <Toggle checked={visible} onChange={(v) => toggleNav(item.id, v)} label={`Show ${item.label} in navigation`} />
+              </div>
             );
           })}
         </div>
       </section>
 
       <section className="glass-card mb-4 p-5">
-        <div className="mb-4 flex items-center gap-3"><Bell size={18} className="text-[var(--accent-secondary)]" /><h2 className="font-display font-semibold text-[var(--text-primary)]">Notifications</h2></div>
-        <label className="flex items-center justify-between"><div><p className="text-sm text-[var(--text-primary)]">Enable notifications</p><p className="text-xs text-[var(--text-secondary)]">Reminders for tasks, quizzes, and habits.</p></div><button onClick={() => setNotifications(!notifications)} className={`relative h-6 w-11 rounded-full transition-colors ${notifications ? 'bg-[var(--accent)]' : 'bg-ink/10'}`}><span className={`absolute top-1 h-4 w-4 rounded-full bg-white transition-transform ${notifications ? 'left-6' : 'left-1'}`} /></button></label>
+        <div className="mb-4 flex items-center gap-3"><Bell size={18} className="text-[var(--accent-secondary)]" /><h2 className="font-display font-semibold text-[var(--text-primary)]">Nudges</h2></div>
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <p className="text-sm text-[var(--text-primary)]">Show nudges on Home</p>
+            <p className="text-xs text-[var(--text-secondary)]">Alora's in-app insights and gentle reminders about tasks, quizzes and habits. Push and email notifications aren't available yet.</p>
+          </div>
+          <Toggle checked={notificationsEnabled} onChange={changeNotifications} label="Show nudges on Home" />
+        </div>
+      </section>
+
+      <section className="glass-card mb-4 p-5">
+        <div className="mb-4 flex items-center gap-3"><SlidersHorizontal size={18} className="text-[var(--accent-secondary)]" /><h2 className="font-display font-semibold text-[var(--text-primary)]">Daily Quiz Mix</h2></div>
+        <p className="mb-4 text-sm text-[var(--text-secondary)]">Choose how your daily quiz is balanced. Weights are relative — they don't have to add up to 100.</p>
+        <div className="space-y-3">
+          {(Object.keys(QUIZ_MIX_LABELS) as (keyof QuizMix)[]).map((key) => (
+            <div key={key}>
+              <div className="mb-1 flex items-center justify-between text-sm">
+                <label htmlFor={`mix-${key}`} className="text-[var(--text-primary)]">{QUIZ_MIX_LABELS[key].label}</label>
+                <span className="tabular-nums text-xs text-[var(--text-secondary)]">{draftMix[key]}</span>
+              </div>
+              <input
+                id={`mix-${key}`}
+                type="range" min={0} max={100} step={5}
+                value={draftMix[key]}
+                onChange={(e) => setDraftMix({ ...draftMix, [key]: Number(e.target.value) })}
+                aria-describedby={`mix-${key}-hint`}
+                className="w-full accent-[var(--accent)]"
+              />
+              <p id={`mix-${key}-hint`} className="text-xs text-[var(--text-secondary)]">{QUIZ_MIX_LABELS[key].hint}</p>
+            </div>
+          ))}
+        </div>
+        <div className="mt-4 flex gap-2">
+          <button onClick={saveQuizMix} className="btn-primary px-4 py-2 text-sm">Save mix</button>
+          <button onClick={() => setDraftMix(DEFAULT_QUIZ_MIX)} className="rounded-xl border border-ink/10 px-4 py-2 text-sm text-[var(--text-primary)] hover:bg-ink/5">Reset to default</button>
+        </div>
       </section>
 
       <section className="glass-card mb-4 p-5">
         <div className="mb-4 flex items-center gap-3"><Brain size={18} className="text-[var(--accent-secondary)]" /><h2 className="font-display font-semibold text-[var(--text-primary)]">AI & Privacy</h2></div>
         <div className="space-y-3 text-sm text-[var(--text-secondary)]">
-          <p>Alora Chat is powered by an AI model, called through a secure server-side function — the API key never reaches your browser. If that function isn't configured yet, Alora falls back to a local rule-based reply so chat still works.</p>
-          <p>Your raw memories and journal entries are never silently overwritten. AI-generated content is always kept separate and marked as a suggestion.</p>
+          <p>Only Alora Chat talks to an AI model, through a secure server-side function — the API key never reaches your browser. Insights, quizzes, reflections and everything else are generated on your device from your own data, using simple rules rather than an AI model. If the chat function isn't available, Alora falls back to a local rule-based reply so chat still works.</p>
+          <p>Your own memories and journal entries are never silently overwritten. Anything Alora infers is kept separate and marked as a suggestion you can correct or dismiss.</p>
         </div>
         <div className="mt-4 border-t border-ink/8 pt-4">
-          <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Customize Alora</label>
+          <label htmlFor="settings-custom-instructions" className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Customize Alora</label>
           <p className="mb-2 text-xs text-[var(--text-secondary)]">Tell Alora how to talk to you — tone, boundaries, what to focus on. Blended into every chat reply.</p>
           <textarea
+            id="settings-custom-instructions"
             value={customInstructions}
             onChange={(e) => setCustomInstructions(e.target.value)}
             placeholder="e.g. Keep it short. Don't sugarcoat missed deadlines. Swear if it fits."
@@ -227,7 +284,7 @@ export function SettingsPage({ onNavigate }: SettingsPageProps) {
       <section className="glass-card mb-4 p-5">
         <div className="mb-4 flex items-center gap-3"><Shield size={18} className="text-[var(--accent-secondary)]" /><h2 className="font-display font-semibold text-[var(--text-primary)]">Your Data</h2></div>
         <p className="mb-4 text-sm text-[var(--text-secondary)]">Your data belongs to you. Export a complete copy at any time.</p>
-        <button onClick={exportData} className="flex items-center gap-2 rounded-xl border border-ink/10 px-4 py-2 text-sm font-medium text-[var(--text-primary)] hover:bg-ink/5"><Download size={16} /> Export All Data</button>
+        <button onClick={exportData} disabled={exporting} className="flex items-center gap-2 rounded-xl border border-ink/10 px-4 py-2 text-sm font-medium text-[var(--text-primary)] hover:bg-ink/5 disabled:opacity-60"><Download size={16} /> {exporting ? 'Exporting…' : 'Export All Data'}</button>
       </section>
 
       <section className="glass-card mb-4 p-5">

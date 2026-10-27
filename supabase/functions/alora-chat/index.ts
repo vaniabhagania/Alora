@@ -72,9 +72,11 @@ Always respond in a natural, human voice. Be concise but substantive.`;
 const CRISIS_RESOURCES = `I hear you, and what you're feeling right now is real. But I want to pause here — what you're describing goes beyond what I'm equipped to help with alone.
 
 If you're in immediate danger or having thoughts of self-harm, please reach out right now:
-- National Suicide Prevention Lifeline (US): 988 or 1-800-273-8255
-- Crisis Text Line: Text HOME to 741741
-- International: findahelpline.com
+- India — Tele-MANAS: call 14416 or 1800-891-4416 (free, 24/7, many languages)
+- India — KIRAN: call 1800-599-0019 (free, 24/7)
+- Emergency in India: 112
+- US: call or text 988 · Crisis Text Line: text HOME to 741741
+- Anywhere else: findahelpline.com
 
 I'm not going anywhere. When you're ready, we'll figure out the next step together. You matter — please talk to someone who can help right now.`;
 
@@ -151,7 +153,13 @@ Deno.serve(async (req: Request) => {
       return json({ error: 'Not authenticated' }, 401);
     }
 
-    const body = await req.json() as { messages: ChatMessage[]; context: ChatContext; healthCheck?: boolean };
+    const body = await req.json() as {
+      messages: ChatMessage[]; context: ChatContext; healthCheck?: boolean;
+      /** string = continue that conversation, null = start a new one, absent = legacy "latest within 6 hours". */
+      conversationId?: string | null;
+      /** false = answer without saving anything (one-off "Ask Alora" questions). */
+      persist?: boolean;
+    };
 
     // A dedicated no-op branch for the System Health check — confirms the
     // function is deployed, reachable, and authenticated, and reports
@@ -267,45 +275,55 @@ Deno.serve(async (req: Request) => {
 
     // ---- Persist the exchange (unified memory) ----
     let conversationId: string | null = null;
-    const { data: recentConvo } = await supabase
-      .from('chat_conversations')
-      .select('id, updated_at')
-      .order('updated_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    const sixHoursAgo = Date.now() - 6 * 60 * 60 * 1000;
-    if (recentConvo && new Date(recentConvo.updated_at as string).getTime() > sixHoursAgo) {
-      conversationId = recentConvo.id as string;
-      await supabase.from('chat_conversations').update({ updated_at: new Date().toISOString() }).eq('id', conversationId);
-    } else {
-      const { data: newConvo } = await supabase
-        .from('chat_conversations')
-        .insert({ title: lastUserMessage.content.slice(0, 60) })
-        .select('id')
-        .maybeSingle();
-      conversationId = (newConvo?.id as string) ?? null;
+    if (body.persist !== false) {
+      conversationId = await resolveConversation(supabase, body.conversationId, lastUserMessage.content);
+      if (conversationId) {
+        await supabase.from('chat_messages').insert([
+          { conversation_id: conversationId, role: 'user', content: lastUserMessage.content },
+          { conversation_id: conversationId, role: 'assistant', content: assistantText },
+        ]);
+        await supabase.from('activity_events').insert({
+          event_type: 'chat_message_sent',
+          entity_type: 'chat',
+          entity_id: conversationId,
+          metadata: {},
+        });
+      }
     }
 
-    if (conversationId) {
-      await supabase.from('chat_messages').insert([
-        { conversation_id: conversationId, role: 'user', content: lastUserMessage.content },
-        { conversation_id: conversationId, role: 'assistant', content: assistantText },
-      ]);
-      await supabase.from('activity_events').insert({
-        event_type: 'chat_message_sent',
-        entity_type: 'chat',
-        entity_id: conversationId,
-        metadata: {},
-      });
-    }
-
-    return json({ message: assistantText, insights: [], suggestedActions: [], flagged: false });
+    return json({ message: assistantText, insights: [], suggestedActions: [], flagged: false, conversationId });
   } catch (err) {
     console.error('alora-chat error:', err);
     return json({ error: err instanceof Error ? err.message : 'Unknown error' }, 500);
   }
 });
+
+// deno-lint-ignore no-explicit-any
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function resolveConversation(supabase: any, requested: string | null | undefined, firstMessage: string): Promise<string | null> {
+  // Continue the conversation the client named — if it still exists and is theirs (RLS scopes the lookup).
+  if (typeof requested === 'string') {
+    const { data } = await supabase.from('chat_conversations').select('id').eq('id', requested).maybeSingle();
+    if (data) {
+      await supabase.from('chat_conversations').update({ updated_at: new Date().toISOString() }).eq('id', data.id);
+      return data.id as string;
+    }
+  } else if (requested === undefined) {
+    // Legacy clients: reuse a conversation still active in the last 6 hours.
+    const { data: recent } = await supabase
+      .from('chat_conversations').select('id, updated_at').order('updated_at', { ascending: false }).limit(1).maybeSingle();
+    if (recent && Date.now() - new Date(recent.updated_at as string).getTime() < 6 * 60 * 60 * 1000) {
+      await supabase.from('chat_conversations').update({ updated_at: new Date().toISOString() }).eq('id', recent.id);
+      return recent.id as string;
+    }
+  }
+  const { data: created } = await supabase
+    .from('chat_conversations')
+    .insert({ title: firstMessage.slice(0, 60) || 'New conversation' })
+    .select('id')
+    .maybeSingle();
+  return (created?.id as string) ?? null;
+}
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {

@@ -13,6 +13,13 @@ export default defineConfig({
   test: {
     environment: 'node',
     globals: true,
+    // Placeholders only — unit tests never talk to a network. They exist so
+    // modules that import the Supabase client can load without a .env file.
+    env: {
+      VITE_SUPABASE_URL: 'http://127.0.0.1:54321',
+      VITE_SUPABASE_ANON_KEY: 'unit-test-anon-key',
+    },
+    include: ['src/**/*.test.ts'],
   },
   optimizeDeps: {
     exclude: ['lucide-react'],

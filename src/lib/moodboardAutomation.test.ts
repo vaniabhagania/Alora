@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { inferObsession, paletteFromObsession } from './moodboardAutomation';
+import { inferObsession, paletteFromObsession, AUTO_WORLD_MARKER, isAutoWorld, visibleWorldDescription, storedWorldDescription, localMonthKey } from './moodboardAutomation';
 
 describe('inferObsession', () => {
   it('picks the most frequently mentioned meaningful word', () => {
@@ -53,5 +53,37 @@ describe('paletteFromObsession', () => {
     expect(theme).toHaveProperty('colors');
     expect(theme).toHaveProperty('typography');
     expect(theme).toHaveProperty('components');
+  });
+});
+
+
+describe('automation world marker', () => {
+  it('recognises the automation world, with or without a description after the marker', () => {
+    expect(isAutoWorld(AUTO_WORLD_MARKER)).toBe(true);
+    expect(isAutoWorld(AUTO_WORLD_MARKER + 'rain and poetry')).toBe(true);
+    expect(isAutoWorld('A world I made')).toBe(false);
+    expect(isAutoWorld(null)).toBe(false);
+  });
+  it('never shows the marker to a person', () => {
+    expect(visibleWorldDescription(AUTO_WORLD_MARKER)).toBe('');
+    expect(visibleWorldDescription(AUTO_WORLD_MARKER + ' rain and poetry ')).toBe('rain and poetry');
+    expect(visibleWorldDescription('Plain text')).toBe('Plain text');
+    expect(visibleWorldDescription(null)).toBe('');
+  });
+  it("keeps the marker when the person edits the automation world's description", () => {
+    expect(storedWorldDescription(AUTO_WORLD_MARKER, '  my words ')).toBe(AUTO_WORLD_MARKER + 'my words');
+    expect(isAutoWorld(storedWorldDescription(AUTO_WORLD_MARKER, ''))).toBe(true);
+  });
+  it('stores an ordinary description as typed, and nothing when it is empty', () => {
+    expect(storedWorldDescription('old', '  new  ')).toBe('new');
+    expect(storedWorldDescription('old', '   ')).toBeNull();
+    expect(storedWorldDescription(null, 'hi')).toBe('hi');
+  });
+});
+
+describe('localMonthKey', () => {
+  it('uses the local calendar month', () => {
+    expect(localMonthKey(new Date(2026, 9, 1, 0, 30))).toBe('2026-10');
+    expect(localMonthKey(new Date(2026, 0, 31, 23, 59))).toBe('2026-01');
   });
 });

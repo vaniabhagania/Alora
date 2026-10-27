@@ -24,3 +24,6 @@ dist-ssr
 .claude
 supabase/.temp
 zip-extract
+
+# Browser end-to-end screenshots / last-run report
+e2e/.out

@@ -1,14 +1,13 @@
 import type {
   AIProvider,
   AIChatResponse,
-  AIQuizQuestion,
   AIClassSummary,
   AITaskExtraction,
   AIReflection,
-  AINovelCuration,
   MemorySearchResult,
   ChatMessage,
   ChatContext,
+  ChatOptions,
 } from './types';
 import { ALORA_SYSTEM_PROMPT, detectEmotionalDistress, detectEmotionalState, CRISIS_RESOURCES } from './types';
 import { RemoteAIProvider } from './remoteProvider';
@@ -38,7 +37,7 @@ function extractUserIntent(content: string): string {
 export class LocalAIProvider implements AIProvider {
   name = 'local';
 
-  async chat(messages: ChatMessage[], context: ChatContext): Promise<AIChatResponse> {
+  async chat(messages: ChatMessage[], context: ChatContext, _options?: ChatOptions): Promise<AIChatResponse> {
     await delay(400 + Math.random() * 600);
 
     const lastUserMessage = [...messages].reverse().find((m) => m.role === 'user');
@@ -86,65 +85,6 @@ export class LocalAIProvider implements AIProvider {
     }
 
     return generateDefaultResponse(lastUserMessage.content, context);
-  }
-
-  async generateQuiz(
-    topics: string[],
-    weakTopics: string[],
-    mix: { recent: number; older: number; weak: number; upcoming: number; lateral: number }
-  ): Promise<AIQuizQuestion[]> {
-    await delay(800);
-    const questions: AIQuizQuestion[] = [];
-    const allTopics = [...new Set([...topics, ...weakTopics])].filter(Boolean);
-
-    if (allTopics.length === 0) {
-      allTopics.push('General Knowledge');
-    }
-
-    for (const topic of allTopics.slice(0, 5)) {
-      questions.push({
-        question_type: 'mcq',
-        question: `Which of the following best describes the core concept of ${topic}?`,
-        options: [
-          `A foundational principle that underpins ${topic}`,
-          `An unrelated mathematical theorem`,
-          `A historical event from the 1800s`,
-          `A type of data structure`,
-        ],
-        correct_answer: `A foundational principle that underpins ${topic}`,
-        explanation: `${topic} is best understood through its foundational principles. Review your class notes for the specific details.`,
-        topic,
-        difficulty: 'medium',
-      });
-    }
-
-    // mix.weak / mix.lateral are 0-100 weights from Settings — a weight of 0
-    // means the user asked to exclude that question type entirely.
-    if (weakTopics.length > 0 && mix.weak > 0) {
-      questions.push({
-        question_type: 'explain',
-        question: `Explain ${weakTopics[0]} in your own words. What is it, why does it matter, and where does it apply?`,
-        options: [],
-        correct_answer: `A thorough explanation demonstrating understanding of ${weakTopics[0]} and its applications.`,
-        explanation: `This is a weak area — focus on understanding the "why" behind ${weakTopics[0]}, not just the "what".`,
-        topic: weakTopics[0],
-        difficulty: 'hard',
-      });
-    }
-
-    if (mix.lateral > 0) {
-      questions.push({
-        question_type: 'lateral',
-        question: `If you had to teach ${allTopics[0] || 'your subject'} to a 10-year-old using only a pizza as a metaphor, how would you do it?`,
-        options: [],
-        correct_answer: `Any creative answer that demonstrates deep understanding through analogy.`,
-        explanation: `Lateral thinking questions test whether you truly understand a concept well enough to explain it through unexpected analogies.`,
-        topic: allTopics[0] || 'General',
-        difficulty: 'hard',
-      });
-    }
-
-    return questions;
   }
 
   async summarizeClass(rawInput: string): Promise<AIClassSummary> {
@@ -214,17 +154,6 @@ export class LocalAIProvider implements AIProvider {
       suggestedActions: topEmotion
         ? ['Name the specific trigger behind this pattern, not just the feeling', 'Bring this pattern up next time you talk to Alora']
         : ['Keep journaling consistently — patterns need volume to show up clearly'],
-    };
-  }
-
-  async curateNovelScene(rawContent: string): Promise<AINovelCuration> {
-    await delay(800);
-    return {
-      curatedContent: rawContent,
-      aiSuggestions: [
-        { type: 'grammar', content: 'Consider tightening this sentence for impact.' },
-        { type: 'context', content: 'Adding sensory detail here would ground the reader.' },
-      ],
     };
   }
 

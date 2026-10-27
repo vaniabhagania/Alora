@@ -80,7 +80,8 @@ export function AskAlora({ contextLabel, contextText, source, attachmentRefs }: 
       ].filter(Boolean).join('\n\n');
 
       const message = { role: 'user' as const, content: prompt, ...(fileAttachments.length ? { attachments: fileAttachments } : {}) };
-      const res = await aiProvider.chat([message], context);
+      // One-off question: answer it, but don't write it (or the quoted context) into the chat history.
+      const res = await aiProvider.chat([message], context, { persist: false });
       setAnswer(res.message);
     } catch {
       setAnswer('Something went wrong. Please try again.');
@@ -90,7 +91,7 @@ export function AskAlora({ contextLabel, contextText, source, attachmentRefs }: 
 
   return (
     <div className="glass-card-flat overflow-hidden">
-      <button onClick={() => setOpen(!open)} className="flex w-full items-center gap-2 px-4 py-3 text-left">
+      <button onClick={() => setOpen(!open)} aria-expanded={open} className="flex w-full items-center gap-2 px-4 py-3 text-left">
         <Sparkles size={14} className="shrink-0 text-[var(--accent-secondary)]" />
         <span className="flex-1 text-sm font-medium text-[var(--text-primary)]">Ask Alora about {contextLabel}</span>
         {!!attachmentRefs?.length && <Paperclip size={12} className="text-[var(--text-secondary)]" />}
@@ -102,12 +103,13 @@ export function AskAlora({ contextLabel, contextText, source, attachmentRefs }: 
             <textarea
               value={question}
               onChange={(e) => setQuestion(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleAsk(); } }}
+              onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); handleAsk(); } }}
+              aria-label={`Ask Alora about ${contextLabel}`}
               placeholder={`Ask anything about ${contextLabel}...`}
               rows={1}
               className="flex-1 resize-none rounded-xl border border-ink/10 bg-ink/[0.03] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50"
             />
-            <button onClick={handleAsk} disabled={!question.trim() || asking} className="btn-primary flex h-9 w-9 shrink-0 items-center justify-center">
+            <button onClick={handleAsk} disabled={!question.trim() || asking} aria-label="Send question" className="btn-primary flex h-9 w-9 shrink-0 items-center justify-center">
               <Send size={14} />
             </button>
           </div>
@@ -120,7 +122,7 @@ export function AskAlora({ contextLabel, contextText, source, attachmentRefs }: 
           )}
           {answer && (
             <div className="mt-3 rounded-xl border border-[var(--accent)]/10 bg-[var(--accent)]/5 px-3 py-2.5">
-              <p className="whitespace-pre-wrap text-sm leading-relaxed text-[var(--text-primary)]">{answer}</p>
+              <p role="status" className="whitespace-pre-wrap text-sm leading-relaxed text-[var(--text-primary)]">{answer}</p>
             </div>
           )}
         </div>

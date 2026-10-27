@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth';
+import { useToast } from '@/lib/toast';
 import type {
   AcademicYear, Semester, Course, Module, Topic, ClassSession, ClassLog,
   Task, QuizAttempt, QuizQuestion,
@@ -21,15 +22,24 @@ export interface AcademicData {
 
 export function useAcademicData() {
   const { profile } = useAuth();
+  const toast = useToast();
   const [data, setData] = useState<AcademicData>({
     years: [], semesters: [], courses: [], modules: [], topics: [],
     classes: [], classLogs: [], tasks: [], quizAttempts: [], quizQuestions: [],
   });
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const hasLoaded = useRef(false);
+  const requestId = useRef(0);
 
-  const loadData = useCallback(async () => {
+  /**
+   * Only the very first load shows a skeleton. Every later reload (after an edit, a logged class…) refreshes in
+   * the background — swapping the whole page for a skeleton threw away which tab and course the student was in.
+   */
+  const loadData = useCallback(async (silent = hasLoaded.current) => {
     if (!profile) return;
-    setLoading(true);
+    const mine = ++requestId.current;
+    if (!silent) { setLoading(true); setError(null); }
     const [y, s, c, m, t, cl, clg, tasks, qa, qq] = await Promise.all([
       supabase.from('academic_years').select('*').order('position'),
       supabase.from('semesters').select('*').order('position'),
@@ -42,6 +52,16 @@ export function useAcademicData() {
       supabase.from('quiz_attempts').select('*').order('completed_at', { ascending: false }),
       supabase.from('quiz_questions').select('*').order('created_at', { ascending: false }),
     ]);
+    if (mine !== requestId.current) return; // a newer load superseded this one
+    const failed = [y, s, c, m, t, cl, clg, tasks, qa, qq].find((r) => r.error);
+    if (failed) {
+      console.warn('[academia] could not load:', failed.error?.message);
+      // Never replace good data with an empty picture: keep what we had and say so.
+      if (hasLoaded.current) toast.show("Couldn't refresh Academia — showing what was already here.", 'error');
+      else setError(failed.error?.message || 'Unknown error');
+      setLoading(false);
+      return;
+    }
     setData({
       years: (y.data as AcademicYear[]) || [],
       semesters: (s.data as Semester[]) || [],
@@ -54,14 +74,16 @@ export function useAcademicData() {
       quizAttempts: (qa.data as QuizAttempt[]) || [],
       quizQuestions: (qq.data as QuizQuestion[]) || [],
     });
+    setError(null);
+    hasLoaded.current = true;
     setLoading(false);
-  }, [profile]);
+  }, [profile, toast]);
 
   useEffect(() => {
-    loadData();
+    loadData(false);
   }, [loadData]);
 
-  return { data, loading, reload: loadData };
+  return { data, loading, error, reload: () => loadData(true), retry: () => loadData(false) };
 }
 
 export interface WeakSpot {

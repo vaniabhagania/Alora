@@ -2,25 +2,26 @@
 
 [![Open in Bolt](https://bolt.new/static/open-in-bolt.svg)](https://bolt.new/~/sb1-p3hm8kpq)
 
-ALORA Personal AI OS — a personal operating system for studying, reflection and
-long-term self-direction. It combines an academic tracker, a spaced-repetition
-quiz engine, task management, journalling, a memory store and a set of creative
-"worlds" behind a single chat-driven interface.
+ALORA Personal AI OS — a personal academic companion and second brain. It combines
+an academic tracker, a retrieval-practice quiz built from your own notes, task
+management, journalling, a memory store and a set of creative spaces, all reading
+and writing **one shared memory layer** (`src/lib/brain/`) behind a chat-driven interface.
 
 ## Features
 
 | Area | What it does |
 | --- | --- |
-| **Home** | Dashboard of streaks, upcoming deadlines and recent activity |
-| **Academia** | Years → semesters → courses → modules → topics hierarchy, with class logs |
-| **Daily Quiz** | Generated questions mixing recent, older, weak and lateral-thinking topics |
-| **Tasks** | Deadlines, priorities and effort estimates |
-| **Alora Chat** | Context-aware chat that reads your stored academic and personal data |
-| **Journal** | Free-form entries with tagging |
-| **My Future** | Future-self identities, goals and habits |
-| **Novel** | Turn your own experiences into structured chapters and scenes |
-| **Memory** | A searchable long-term store of things you want Alora to remember |
-| **Your Worlds** | Moodboards, themes and appearance editing |
+| **Home** | Today at a glance: streak, deadlines, goal progress, nudges and recent activity — all derived from real data |
+| **Academia** | Years → semesters → courses → modules → topics hierarchy, with editable class logs that feed Memory automatically |
+| **Daily Quiz** | Retrieval practice generated from *your* topics and notes (mixing recent, older and weak material); open answers are self-rated |
+| **Tasks** | Deadlines, priorities, effort estimates, and links to goals / identities / courses |
+| **Routines** | A deadline-aware plan for the rest of today. It flags tasks that will miss their deadline and lists what doesn't fit instead of hiding it |
+| **Alora Chat** | Context-aware chat with conversation history; falls back to a local agent if the model is unreachable |
+| **Journal** | Free-form entries with mood and tags; "Remember" turns an entry into a memory only when you choose |
+| **My Future** | Future-self identities, goals and habits (create / edit / delete; progress is derived from linked work) |
+| **Novel** | Turn your own experiences into structured chapters and scenes with your own curation notes |
+| **Memory** | A searchable long-term store: reinforce, correct or dismiss what Alora has inferred |
+| **Vibe Check** | Worlds, moodboards and appearance; an optional monthly theme drawn only from your own words |
 
 ## Tech stack
 
@@ -89,6 +90,9 @@ quiz engine, task management, journalling, a memory store and a set of creative
 | `npm run preview` | Serve the production build locally |
 | `npm run lint` | Run ESLint |
 | `npm run typecheck` | Type-check without emitting output |
+| `npm test` | Unit tests (Vitest) |
+| `npm run e2e` | Browser end-to-end suite against the in-memory Supabase stand-in (see [Testing](#testing)) |
+| `npm run healthcheck` | Typecheck + lint + unit tests + build + E2E — what the 9:00 AM scheduled check runs |
 
 ## Project structure
 
@@ -110,35 +114,52 @@ supabase/migrations/  Schema and row-level security policies
 
 ## AI provider
 
-`src/lib/ai/provider.ts` currently ships a **local, rule-based provider**
-(`LocalAIProvider`). It produces responses from your own stored data using
-pattern matching and templates — no external API key is required, and no data
-leaves the browser.
+Only `chat()` leaves the browser. It calls the `alora-chat` Supabase **edge function**, which holds the
+Gemini key server-side (it never reaches the client bundle), scans for distress language *before* anything is sent to
+the model, saves the exchange to `chat_conversations` / `chat_messages`, and returns the reply.
 
-It implements the `AIProvider` interface in `src/lib/ai/types.ts`, so swapping in
-a real model means writing a new class against that interface and changing the
-single `aiProvider` export at the bottom of `provider.ts`.
+Everything else — class summaries, task extraction, journal reflection, memory search — is **local and rule-based**
+(`LocalAIProvider` in `src/lib/ai/provider.ts`), reads only your own stored data, and never calls an external service. If the
+edge function is missing or unreachable, chat degrades to the same local agent and the exchange is still saved.
 
-Note that only `chat()` and `generateQuiz()` are wired into the UI today. See
-[Status](#status) for what remains.
+To enable the full model:
+
+```bash
+supabase functions deploy alora-chat
+supabase secrets set GEMINI_API_KEY=...        # set by you; never committed
+```
+
+The provider contract is the `AIProvider` interface in `src/lib/ai/types.ts`.
+
+## Testing
+
+There are three layers, all runnable without any real credentials:
+
+| Layer | Command | What it covers |
+| --- | --- | --- |
+| Static | `npm run typecheck` · `npm run lint` | Types and lint |
+| Unit | `npm test` | Pure logic: routines planner, habits/streaks, quiz mix, novel ordering, AI routing, crisis detection, … |
+| End-to-end | `npm run e2e` (or `node e2e/run.mjs tasks,journal` for some areas) | The real app in headless Chromium, desktop / tablet / phone, against `tools/fake-supabase` |
+
+`tools/fake-supabase` is an in-memory stand-in for Supabase whose tables, defaults, NOT NULL / UNIQUE / CHECK rules and
+foreign-key cascades are parsed from `supabase/migrations/`, so it cannot drift from the schema. It can also inject
+failures (`/__fake/faults`) so error paths are tested, not just happy paths.
+
+The E2E suite needs Playwright + Chromium, which are **not** project dependencies (they are provided by the
+environment); install them yourself with `npm i -D playwright && npx playwright install chromium` to run it locally.
+
+**It does not replace a check against your live Supabase project and a real Gemini key** — run the app once with your
+real `.env` after any schema or edge-function change.
 
 ## Status
 
-Implemented and wired up:
+Every page supports create / view / edit / delete where that makes sense, reports failed saves and loads honestly
+(never as an empty state), and writes into the shared brain (`src/lib/brain/`).
 
-- Full academic hierarchy, class logging and dashboards
-- Quiz generation and attempts
-- Tasks, journal, memory, future-self and worlds pages
-- Supabase auth and row-level security across all tables
+Known limits:
 
-Not yet wired up — these exist on the `AIProvider` interface and have stub
-implementations in `LocalAIProvider`, but nothing in the UI calls them:
-
-- `summarizeClass()` — returns fixed strings and ignores its input
-- `extractTasks()` — always returns an empty task list
-- `reflect()` — returns literal placeholder text
-- `curateNovelScene()` — returns two generic suggestions
-- `searchMemories()` — implemented, but the Memory page filters locally instead
+- Push and email notifications don't exist yet; the Settings toggle controls the in-app nudges on Home.
+- Playwright is not in `package.json`; the E2E suite needs it installed locally.
 
 ## License
 

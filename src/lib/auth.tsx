@@ -1,13 +1,25 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import type { AloraProfile } from '@/lib/types';
+
+export type ProfileStatus = 'idle' | 'loading' | 'ready' | 'error';
 
 interface AuthContextValue {
   session: Session | null;
   user: User | null;
   profile: AloraProfile | null;
+  /** True only during the very first session restore (and the profile fetch that follows it). */
   loading: boolean;
+  /** Signed in, but the profile row hasn't loaded (yet / at all). */
+  profileStatus: ProfileStatus;
+  /** Set when the stored session couldn't be restored (offline, bad config, ...). */
+  bootError: string | null;
+  /** True after the user opened a password-reset link: they must choose a new password. */
+  recoveryMode: boolean;
+  resetPassword: (email: string) => Promise<{ error: string | null }>;
+  updatePassword: (newPassword: string) => Promise<{ error: string | null }>;
+  retryProfile: () => Promise<void>;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
   signUp: (
     email: string,
@@ -48,74 +60,94 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<AloraProfile | null>(null);
+  const [profileStatus, setProfileStatus] = useState<ProfileStatus>('idle');
   const [loading, setLoading] = useState(true);
+  const [bootError, setBootError] = useState<string | null>(null);
+  const [recoveryMode, setRecoveryMode] = useState(false);
+  // Tracks which user the loaded profile belongs to, so TOKEN_REFRESHED /
+  // repeated SIGNED_IN events (tab refocus) don't re-fetch the profile.
+  const loadedFor = useRef<string | null>(null);
+
+  const loadProfile = useCallback(async (userId: string): Promise<boolean> => {
+    setProfileStatus('loading');
+    const read = () =>
+      supabase.from('alora_profiles').select('*').eq('user_id', userId).maybeSingle();
+
+    const first = await read();
+    if (first.error) { setProfileStatus('error'); return false; }
+    if (first.data) {
+      setProfile(first.data as AloraProfile);
+      loadedFor.current = userId;
+      setProfileStatus('ready');
+      return true;
+    }
+
+    // First sign-in: create the profile row. `ignoreDuplicates` makes this a
+    // race-safe INSERT … ON CONFLICT DO NOTHING — sign-up fires an identical
+    // upsert from the other side, and a plain insert used to lose that race
+    // with a 409 (a console error on every single sign-up).
+    const created = await supabase
+      .from('alora_profiles')
+      .upsert({ user_id: userId, display_name: '' }, { onConflict: 'user_id', ignoreDuplicates: true });
+    if (created.error) { setProfileStatus('error'); return false; }
+
+    const second = await read();
+    if (second.error || !second.data) { setProfileStatus('error'); return false; }
+    setProfile(second.data as AloraProfile);
+    loadedFor.current = userId;
+    setProfileStatus('ready');
+    return true;
+  }, []);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
+    let cancelled = false;
 
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      (async () => {
+    supabase.auth.getSession()
+      .then(async ({ data: { session } }) => {
+        if (cancelled) return;
         setSession(session);
         setUser(session?.user ?? null);
-        if (session?.user) {
-          await loadProfile(session.user.id);
+        // Keep `loading` true until the profile is in, so the UI never flashes
+        // a signed-in shell with a blank "there" name.
+        if (session?.user) await loadProfile(session.user.id);
+      })
+      .catch((err) => {
+        // Previously unhandled → "Loading ALORA..." forever when the network
+        // or the Supabase URL was wrong.
+        if (cancelled) return;
+        console.error('[ALORA] could not restore session:', err);
+        setBootError("Couldn't reach ALORA's server to restore your session. Check your connection and try again.");
+      })
+      .finally(() => { if (!cancelled) setLoading(false); });
+
+    const { data: listener } = supabase.auth.onAuthStateChange((event, next) => {
+      // Never `await` a Supabase call inside this callback body (supabase-js
+      // can deadlock) — defer to an async IIFE like before.
+      (async () => {
+        if (event === 'PASSWORD_RECOVERY') setRecoveryMode(true);
+        setSession(next);
+        setUser(next?.user ?? null);
+        if (next?.user) {
+          setBootError(null);
+          if (loadedFor.current !== next.user.id) await loadProfile(next.user.id);
         } else {
+          loadedFor.current = null;
           setProfile(null);
+          setProfileStatus('idle');
+          setRecoveryMode(false);
         }
       })();
     });
 
-    return () => listener.subscription.unsubscribe();
-  }, []);
+    return () => { cancelled = true; listener.subscription.unsubscribe(); };
+  }, [loadProfile]);
 
-  async function loadProfile(userId: string) {
-    const { data } = await supabase
-      .from('alora_profiles')
-      .select('*')
-      .eq('user_id', userId)
-      .maybeSingle();
-
-    if (data) {
-      setProfile(data as AloraProfile);
-      return;
-    }
-
-    const { data: newProfile, error: insertError } = await supabase
-      .from('alora_profiles')
-      .insert({ user_id: userId, display_name: '' })
-      .select('*')
-      .maybeSingle();
-
-    if (newProfile) {
-      setProfile(newProfile as AloraProfile);
-      return;
-    }
-
-    // Signing in on another device/tab at nearly the same moment (e.g. the
-    // very first sign-in right after signup) can race this insert against
-    // an identical one from that other session — user_id is UNIQUE, so
-    // whichever loses hits a conflict. Re-select instead of leaving the
-    // profile stuck at null.
-    if (insertError) {
-      const { data: existing } = await supabase
-        .from('alora_profiles')
-        .select('*')
-        .eq('user_id', userId)
-        .maybeSingle();
-      if (existing) setProfile(existing as AloraProfile);
-    }
-  }
-
-  async function signIn(email: string, password: string) {
+  const signIn = useCallback(async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     return { error: error ? friendlyAuthError(error) : null };
-  }
+  }, []);
 
-  async function signUp(email: string, password: string, displayName: string) {
+  const signUp = useCallback(async (email: string, password: string, displayName: string) => {
     const { data, error } = await supabase.auth.signUp({ email, password });
     if (error) return { error: friendlyAuthError(error), needsEmailConfirmation: false };
 
@@ -127,40 +159,46 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     if (data.user) {
-      const { error: insertError } = await supabase.from('alora_profiles').insert({
-        user_id: data.user.id,
-        display_name: displayName,
-      });
-      if (insertError) {
-        // onAuthStateChange's loadProfile() can race this same insert (it
-        // fires as soon as the new session lands) and win, creating a
-        // blank-name profile row first — apply the real display name to it.
-        await supabase
-          .from('alora_profiles')
-          .update({ display_name: displayName })
-          .eq('user_id', data.user.id);
-      }
+      // Upsert-merge: whichever of this and loadProfile() runs first creates
+      // the row, and this one always leaves the real display name on it.
+      await supabase
+        .from('alora_profiles')
+        .upsert({ user_id: data.user.id, display_name: displayName }, { onConflict: 'user_id' });
       await loadProfile(data.user.id);
     }
     return { error: null, needsEmailConfirmation: false };
-  }
+  }, [loadProfile]);
 
-  async function signOut() {
+  const signOut = useCallback(async () => {
     await supabase.auth.signOut();
+    loadedFor.current = null;
     setProfile(null);
-  }
+    setProfileStatus('idle');
+  }, []);
 
-  async function refreshProfile() {
+  const refreshProfile = useCallback(async () => {
     if (user) await loadProfile(user.id);
-  }
+  }, [user, loadProfile]);
 
-  return (
-    <AuthContext.Provider
-      value={{ session, user, profile, loading, signIn, signUp, signOut, refreshProfile }}
-    >
-      {children}
-    </AuthContext.Provider>
-  );
+  const retryProfile = refreshProfile;
+
+  const resetPassword = useCallback(async (email: string) => {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin });
+    return { error: error ? friendlyAuthError(error) : null };
+  }, []);
+
+  const updatePassword = useCallback(async (newPassword: string) => {
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (!error) setRecoveryMode(false);
+    return { error: error ? friendlyAuthError(error) : null };
+  }, []);
+
+  const value = useMemo<AuthContextValue>(() => ({
+    session, user, profile, loading, profileStatus, bootError, recoveryMode,
+    signIn, signUp, signOut, refreshProfile, retryProfile, resetPassword, updatePassword,
+  }), [session, user, profile, loading, profileStatus, bootError, recoveryMode, signIn, signUp, signOut, refreshProfile, retryProfile, resetPassword, updatePassword]);
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth() {

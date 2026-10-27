@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildDailySchedule, parseEffortMinutes } from './routines';
+import { buildDailySchedule, parseEffortMinutes, planDailySchedule } from './routines';
 import type { Task, Goal } from '@/lib/types';
 
 function makeTask(overrides: Partial<Task> = {}): Task {
@@ -118,6 +118,132 @@ describe('buildDailySchedule', () => {
     const lateNight = new Date();
     lateNight.setHours(23, 0, 0, 0);
     const blocks = buildDailySchedule([makeTask()], [], lateNight);
+    expect(blocks).toEqual([]);
+  });
+});
+
+
+/** Today at h:mm local — fixed instants so none of these depend on when the suite runs. */
+function at(h: number, m = 0): Date {
+  const d = new Date();
+  d.setHours(h, m, 0, 0);
+  return d;
+}
+
+describe('planDailySchedule — deadlines', () => {
+  it('orders work that is not yet due by deadline, not by priority', () => {
+    const tasks = [
+      makeTask({ id: 'later-medium', priority: 'medium', deadline: at(21).toISOString() }),
+      makeTask({ id: 'sooner-low', priority: 'low', deadline: at(11).toISOString() }),
+    ];
+    const { blocks } = planDailySchedule(tasks, [], at(9));
+    expect(blocks.map((b) => b.sourceId)).toEqual(['sooner-low', 'later-medium']);
+  });
+
+  it('uses priority to break a deadline tie', () => {
+    const d = at(15).toISOString();
+    const { blocks } = planDailySchedule([
+      makeTask({ id: 'low', priority: 'low', deadline: d }),
+      makeTask({ id: 'high', priority: 'high', deadline: d }),
+    ], [], at(9));
+    expect(blocks.map((b) => b.sourceId)).toEqual(['high', 'low']);
+  });
+
+  it('puts overdue urgent/high work first, and overdue low-priority work last', () => {
+    const { blocks } = planDailySchedule([
+      makeTask({ id: 'overdue-low', priority: 'low', deadline: at(8).toISOString() }),
+      makeTask({ id: 'due-noon', priority: 'medium', deadline: at(12).toISOString() }),
+      makeTask({ id: 'overdue-urgent', priority: 'urgent', deadline: at(7).toISOString() }),
+    ], [], at(9));
+    expect(blocks.map((b) => b.sourceId)).toEqual(['overdue-urgent', 'due-noon', 'overdue-low']);
+    expect(blocks.find((b) => b.sourceId === 'overdue-urgent')?.overdue).toBe(true);
+    expect(blocks.find((b) => b.sourceId === 'due-noon')?.overdue).toBe(false);
+  });
+
+  it('flags a block that ends after its own deadline instead of hiding it', () => {
+    const { blocks } = planDailySchedule([
+      makeTask({ id: 'tight', estimated_effort: '2h', deadline: at(10, 30).toISOString() }),
+      makeTask({ id: 'roomy', estimated_effort: '30m', deadline: at(20).toISOString() }),
+    ], [], at(9));
+    const tight = blocks.find((b) => b.sourceId === 'tight');
+    expect(tight?.late).toBe(true);
+    expect(blocks.find((b) => b.sourceId === 'roomy')?.late).toBe(false);
+  });
+
+  it('does not mark a task late when it finishes exactly on time', () => {
+    const { blocks } = planDailySchedule([makeTask({ estimated_effort: '60m', deadline: at(10).toISOString() })], [], at(9));
+    expect(blocks[0].late).toBe(false);
+  });
+
+  it('carries the task deadline on its block', () => {
+    const dl = at(14).toISOString();
+    const { blocks } = planDailySchedule([makeTask({ deadline: dl })], [], at(9));
+    expect(blocks[0].deadline).toBe(dl);
+  });
+
+  it('ignores a task whose deadline is not a valid date', () => {
+    const { blocks, unscheduled } = planDailySchedule([makeTask({ deadline: 'not-a-date' })], [], at(9));
+    expect(blocks).toEqual([]);
+    expect(unscheduled).toEqual([]);
+  });
+});
+
+describe('planDailySchedule — what does not fit', () => {
+  it('reports tasks that could not be placed before the end of the day', () => {
+    const tasks = Array.from({ length: 8 }, (_, i) => makeTask({ id: `t${i}`, estimated_effort: '2h', deadline: at(12).toISOString() }));
+    const { blocks, unscheduled } = planDailySchedule(tasks, [], at(10));
+    expect(unscheduled.length).toBeGreaterThan(0);
+    expect(blocks.length + unscheduled.length).toBe(tasks.length);
+    const cutoff = at(22).getTime();
+    for (const b of blocks) expect(new Date(b.end).getTime()).toBeLessThanOrEqual(cutoff);
+  });
+
+  it('shortens the last block to the day end and says so', () => {
+    const { blocks } = planDailySchedule([makeTask({ estimated_effort: '2h', deadline: at(23).toISOString() })], [], at(21));
+    expect(blocks[0].truncated).toBe(true);
+    expect(new Date(blocks[0].end).getTime()).toBe(at(22).getTime());
+  });
+
+  it('does not create a sliver of a block when under 15 minutes remain', () => {
+    const { blocks, unscheduled } = planDailySchedule([makeTask({ id: 'x', deadline: at(23).toISOString() })], [], at(21, 50));
+    expect(blocks).toEqual([]);
+    expect(unscheduled.map((t) => t.id)).toEqual(['x']);
+  });
+
+  it('says the day is over, and still lists what was left undone', () => {
+    const plan = planDailySchedule([makeTask({ id: 'left', deadline: at(23).toISOString() })], [], at(22, 30));
+    expect(plan.dayEnded).toBe(true);
+    expect(plan.blocks).toEqual([]);
+    expect(plan.unscheduled.map((t) => t.id)).toEqual(['left']);
+  });
+});
+
+describe('planDailySchedule — goal check-in', () => {
+  it('checks in on the goal with the nearest target date', () => {
+    const { blocks } = planDailySchedule([], [
+      makeGoal({ id: 'far', title: 'Far', target_date: '2027-06-01' }),
+      makeGoal({ id: 'near', title: 'Near', target_date: '2026-11-01' }),
+      makeGoal({ id: 'none', title: 'No date', target_date: null }),
+    ], at(9));
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0].sourceId).toBe('near');
+  });
+
+  it('falls back to the goal furthest from done when no goal has a date', () => {
+    const { blocks } = planDailySchedule([], [
+      makeGoal({ id: 'half', progress: 50 }),
+      makeGoal({ id: 'barely', progress: 5 }),
+    ], at(9));
+    expect(blocks[0].sourceId).toBe('barely');
+  });
+
+  it('never checks in on a finished goal', () => {
+    const { blocks } = planDailySchedule([], [makeGoal({ progress: 100 }), makeGoal({ id: 'done', status: 'completed' })], at(9));
+    expect(blocks).toEqual([]);
+  });
+
+  it('skips the check-in when too little of the day is left', () => {
+    const { blocks } = planDailySchedule([], [makeGoal()], at(21, 50));
     expect(blocks).toEqual([]);
   });
 });

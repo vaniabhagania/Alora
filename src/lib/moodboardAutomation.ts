@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import { DEFAULT_WORLD_THEME } from '@/lib/theme';
+import { localDateKey } from '@/lib/dates';
 import type { AloraProfile, WorldThemeSettings } from '@/lib/types';
 
 // A reserved marker (not something a real user would ever type) stored in
@@ -8,6 +9,29 @@ import type { AloraProfile, WorldThemeSettings } from '@/lib/types';
 // There's no dedicated column for this — adding one would mean a new
 // migration for what's otherwise a zero-schema-change feature.
 export const AUTO_WORLD_MARKER = '​__alora_monthly_auto__​';
+
+/** Is this the world the monthly automation owns? (It may have a description after the marker.) */
+export const isAutoWorld = (description: string | null | undefined): boolean => !!description && description.startsWith(AUTO_WORLD_MARKER);
+
+/** The description a person should see: the internal marker is bookkeeping, never content. */
+export function visibleWorldDescription(description: string | null | undefined): string {
+  if (!description) return '';
+  return isAutoWorld(description) ? description.slice(AUTO_WORLD_MARKER.length).trim() : description;
+}
+
+/**
+ * Re-attaches the marker when the person edits the description of the automation's world, so renaming or
+ * describing it never makes the automation lose track of "its" world and create a second one next month.
+ * Returns null for an empty description (the column is nullable).
+ */
+export function storedWorldDescription(previous: string | null | undefined, edited: string): string | null {
+  const text = edited.trim();
+  if (isAutoWorld(previous)) return AUTO_WORLD_MARKER + text;
+  return text || null;
+}
+
+/** "2026-10" in the person's own calendar — not UTC, which is still last month for the first 5½ hours in India. */
+export const localMonthKey = (d: Date = new Date()): string => localDateKey(d).slice(0, 7);
 
 const STOPWORDS = new Set([
   'the', 'and', 'that', 'have', 'with', 'this', 'from', 'they', 'been', 'were',
@@ -31,6 +55,8 @@ const STOPWORDS = new Set([
  * edge function, to keep the API key server-side. Requires at least 2
  * mentions before calling something an "obsession" rather than noise.
  */
+export const NEUTRAL_OBSESSION = 'everyday life';
+
 export function inferObsession(texts: string[]): string {
   const counts = new Map<string, number>();
   for (const text of texts) {
@@ -41,7 +67,7 @@ export function inferObsession(texts: string[]): string {
     }
   }
   const sorted = [...counts.entries()].sort((a, b) => b[1] - a[1]);
-  if (sorted.length === 0 || sorted[0][1] < 2) return 'everyday life';
+  if (sorted.length === 0 || sorted[0][1] < 2) return NEUTRAL_OBSESSION;
   return sorted[0][0];
 }
 
@@ -109,69 +135,76 @@ function getPrefs(profile: AloraProfile): MoodboardAutomationPrefs {
 }
 
 /**
- * Runs at most once per calendar month, on-by-default (opt-out via the
- * Settings toggle). Reads the last 30 days of journal entries and the
- * user's own chat messages, infers an obsession, generates a theme, and
- * creates-or-updates one reserved world for it (see AUTO_WORLD_MARKER)
- * rather than accumulating a new world every month.
+ * Runs at most once per calendar month, on-by-default (opt-out via the Settings toggle). Reads the last 30
+ * days of journal entries and the user's own chat messages, infers an obsession, generates a theme, and
+ * creates-or-updates one reserved world for it (see AUTO_WORLD_MARKER) rather than accumulating a new world
+ * every month.
+ *
+ * Every write is checked, in an order that cannot leave the person worse off: the world is created or
+ * updated FIRST, and only a world that exists is switched on. The month is recorded as done only after all
+ * of it worked — previously a failed insert still deactivated the person's current world and marked the
+ * month as handled, so a transient error meant no vibe at all until next month.
  */
-export async function maybeRunMonthlyMoodboardAutomation(profile: AloraProfile): Promise<{ ran: boolean; obsession?: string }> {
+export async function maybeRunMonthlyMoodboardAutomation(profile: AloraProfile): Promise<{ ran: boolean; obsession?: string; worldName?: string }> {
   const existingPrefs = getPrefs(profile);
   if (existingPrefs.enabled === false) return { ran: false };
 
-  const currentMonth = new Date().toISOString().slice(0, 7);
+  const currentMonth = localMonthKey();
   if (existingPrefs.lastGeneratedMonth === currentMonth) return { ran: false };
 
   const since = new Date();
   since.setDate(since.getDate() - 30);
 
-  const [{ data: journalRows }, { data: chatRows }] = await Promise.all([
+  const [journal, chat] = await Promise.all([
     supabase.from('journal_entries').select('content').gte('created_at', since.toISOString()).limit(30),
     supabase.from('chat_messages').select('content').eq('role', 'user').gte('created_at', since.toISOString()).limit(40),
   ]);
+  // Without the person's text the "obsession" would silently be the neutral default — don't stamp the month on that.
+  if (journal.error || chat.error) return { ran: false };
 
   const texts = [
-    ...((journalRows ?? []) as { content: string }[]).map((r) => r.content),
-    ...((chatRows ?? []) as { content: string }[]).map((r) => r.content),
+    ...((journal.data ?? []) as { content: string }[]).map((r) => r.content),
+    ...((chat.data ?? []) as { content: string }[]).map((r) => r.content),
   ];
 
   const obsession = inferObsession(texts);
+  // Nothing in the person's own words stands out (a brand-new account has no words at all): don't invent a
+  // "vibe" from the neutral fallback and switch their whole interface to it. The month is left unrecorded so
+  // it can happen once there is something real to base it on.
+  if (obsession === NEUTRAL_OBSESSION) return { ran: false };
   const theme = paletteFromObsession(obsession);
   const monthLabel = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
   const worldName = `${monthLabel} — ${obsession}`;
+  const themeJson = theme as unknown as Record<string, unknown>;
 
-  const { data: existingWorld } = await supabase
-    .from('worlds')
-    .select('id')
-    .eq('description', AUTO_WORLD_MARKER)
-    .maybeSingle();
+  const found = await supabase.from('worlds').select('id').ilike('description', `${AUTO_WORLD_MARKER}%`).order('created_at').limit(1);
+  if (found.error) return { ran: false };
+  const existingId = (found.data?.[0] as { id: string } | undefined)?.id;
 
-  // Same "deactivate all, then activate one" pattern as activateWorld() —
-  // is_active is enforced at the application level, not a DB constraint.
-  await supabase.from('worlds').update({ is_active: false }).not('id', 'is', null);
-
-  if (existingWorld) {
-    await supabase.from('worlds').update({
-      name: worldName,
-      theme_settings: theme as unknown as Record<string, unknown>,
-      is_active: true,
-      updated_at: new Date().toISOString(),
-    }).eq('id', existingWorld.id);
+  let worldId = existingId;
+  if (existingId) {
+    const { error } = await supabase.from('worlds').update({ name: worldName, theme_settings: themeJson, updated_at: new Date().toISOString() }).eq('id', existingId);
+    if (error) return { ran: false };
   } else {
-    await supabase.from('worlds').insert({
-      name: worldName,
-      description: AUTO_WORLD_MARKER,
-      theme_settings: theme as unknown as Record<string, unknown>,
-      is_active: true,
-    });
+    const { data, error } = await supabase.from('worlds')
+      .insert({ name: worldName, description: AUTO_WORLD_MARKER, theme_settings: themeJson })
+      .select('id').maybeSingle();
+    if (error || !data) return { ran: false };
+    worldId = (data as { id: string }).id;
   }
 
-  await supabase.from('alora_profiles').update({
+  // Switch it on, then switch the others off (same order as activateWorld: a failure can never leave NO active world).
+  const on = await supabase.from('worlds').update({ is_active: true, updated_at: new Date().toISOString() }).eq('id', worldId as string);
+  if (on.error) return { ran: false };
+  await supabase.from('worlds').update({ is_active: false }).neq('id', worldId as string);
+
+  const saved = await supabase.from('alora_profiles').update({
     preferences: {
       ...profile.preferences,
       moodboardAutomation: { ...existingPrefs, lastGeneratedMonth: currentMonth, lastObsession: obsession },
     },
   }).eq('id', profile.id);
+  if (saved.error) console.warn('[vibe] monthly world was set up but the month could not be recorded:', saved.error.message);
 
-  return { ran: true, obsession };
+  return { ran: true, obsession, worldName };
 }

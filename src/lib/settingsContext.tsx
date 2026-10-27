@@ -1,16 +1,39 @@
-import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, useCallback, useMemo, type ReactNode } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth';
+import { DEFAULT_QUIZ_MIX, normalizeMix, type QuizMix } from '@/lib/quizMix';
 
 type ThemeMode = 'light' | 'dark';
+
+const THEME_CACHE_KEY = 'alora-theme-mode';
+
+/**
+ * The real theme lives in the database, but waiting for that fetch before
+ * painting made every dark-mode user see a light flash on each load. The last
+ * known mode is cached locally and applied before first paint (see the inline
+ * script in index.html); the database remains the source of truth and
+ * overwrites the cache once it answers.
+ */
+function readCachedTheme(): ThemeMode {
+  try { return localStorage.getItem(THEME_CACHE_KEY) === 'dark' ? 'dark' : 'light'; } catch { return 'light'; }
+}
+function cacheTheme(mode: ThemeMode) {
+  try { localStorage.setItem(THEME_CACHE_KEY, mode); } catch { /* storage unavailable (private mode) — fine */ }
+  document.documentElement.dataset.theme = mode;
+}
 
 interface SettingsContextValue {
   hiddenNavItems: string[];
   themeMode: ThemeMode;
+  notificationsEnabled: boolean;
+  quizMix: QuizMix;
   loading: boolean;
-  setHiddenNavItems: (ids: string[]) => Promise<void>;
-  toggleNavItem: (id: string, visible: boolean) => Promise<void>;
-  setThemeMode: (mode: ThemeMode) => Promise<void>;
+  /** Every setter applies instantly, then reverts and resolves `false` if the save fails. */
+  setHiddenNavItems: (ids: string[]) => Promise<boolean>;
+  toggleNavItem: (id: string, visible: boolean) => Promise<boolean>;
+  setThemeMode: (mode: ThemeMode) => Promise<boolean>;
+  setNotificationsEnabled: (enabled: boolean) => Promise<boolean>;
+  setQuizMix: (mix: QuizMix) => Promise<boolean>;
 }
 
 const SettingsContext = createContext<SettingsContextValue | undefined>(undefined);
@@ -18,19 +41,33 @@ const SettingsContext = createContext<SettingsContextValue | undefined>(undefine
 export function SettingsProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const [hiddenNavItems, setHiddenNavItemsState] = useState<string[]>([]);
-  const [themeMode, setThemeModeState] = useState<ThemeMode>('light');
+  const [themeMode, setThemeModeState] = useState<ThemeMode>(readCachedTheme);
+  const [notificationsEnabled, setNotificationsState] = useState(true);
+  const [quizMix, setQuizMixState] = useState<QuizMix>(DEFAULT_QUIZ_MIX);
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => { cacheTheme(themeMode); }, [themeMode]);
 
   const refresh = useCallback(async () => {
     if (!user) {
       setHiddenNavItemsState([]);
-      setThemeModeState('light');
       setLoading(false);
       return;
     }
-    const { data } = await supabase.from('settings').select('hidden_nav_items, theme_mode').maybeSingle();
-    setHiddenNavItemsState((data?.hidden_nav_items as string[] | undefined) || []);
-    setThemeModeState((data?.theme_mode as ThemeMode | undefined) || 'light');
+    const { data, error } = await supabase
+      .from('settings')
+      .select('hidden_nav_items, theme_mode, notifications_enabled, quiz_mix')
+      .maybeSingle();
+    // On a failed read keep what we have (cached theme, defaults) instead of
+    // silently resetting the user's choices.
+    if (!error) {
+      setHiddenNavItemsState((data?.hidden_nav_items as string[] | undefined) || []);
+      if (data?.theme_mode) setThemeModeState(data.theme_mode as ThemeMode);
+      setNotificationsState(data?.notifications_enabled ?? true);
+      setQuizMixState(normalizeMix(data?.quiz_mix));
+    } else {
+      console.warn('[settings] could not load settings:', error.message);
+    }
     setLoading(false);
   }, [user]);
 
@@ -38,32 +75,59 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     refresh();
   }, [refresh]);
 
-  const setHiddenNavItems = useCallback(async (ids: string[]) => {
-    if (!user) return;
-    setHiddenNavItemsState(ids);
-    await supabase
+  const persist = useCallback(async (patch: Record<string, unknown>): Promise<boolean> => {
+    if (!user) return false;
+    const { error } = await supabase
       .from('settings')
-      .upsert({ user_id: user.id, hidden_nav_items: ids, updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
+      .upsert({ user_id: user.id, ...patch, updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
+    if (error) { console.warn('[settings] save failed:', error.message); return false; }
+    return true;
   }, [user]);
+
+  const setHiddenNavItems = useCallback(async (ids: string[]) => {
+    const prev = hiddenNavItems;
+    setHiddenNavItemsState(ids);
+    const ok = await persist({ hidden_nav_items: ids });
+    if (!ok) setHiddenNavItemsState(prev);
+    return ok;
+  }, [hiddenNavItems, persist]);
 
   const toggleNavItem = useCallback(async (id: string, visible: boolean) => {
     const next = visible ? hiddenNavItems.filter((n) => n !== id) : [...new Set([...hiddenNavItems, id])];
-    await setHiddenNavItems(next);
+    return setHiddenNavItems(next);
   }, [hiddenNavItems, setHiddenNavItems]);
 
   const setThemeMode = useCallback(async (mode: ThemeMode) => {
-    if (!user) return;
+    const prev = themeMode;
     setThemeModeState(mode);
-    await supabase
-      .from('settings')
-      .upsert({ user_id: user.id, theme_mode: mode, updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
-  }, [user]);
+    const ok = await persist({ theme_mode: mode });
+    if (!ok) setThemeModeState(prev);
+    return ok;
+  }, [themeMode, persist]);
 
-  return (
-    <SettingsContext.Provider value={{ hiddenNavItems, themeMode, loading, setHiddenNavItems, toggleNavItem, setThemeMode }}>
-      {children}
-    </SettingsContext.Provider>
-  );
+  const setNotificationsEnabled = useCallback(async (enabled: boolean) => {
+    const prev = notificationsEnabled;
+    setNotificationsState(enabled);
+    const ok = await persist({ notifications_enabled: enabled });
+    if (!ok) setNotificationsState(prev);
+    return ok;
+  }, [notificationsEnabled, persist]);
+
+  const setQuizMix = useCallback(async (mix: QuizMix) => {
+    const prev = quizMix;
+    const clean = normalizeMix(mix);
+    setQuizMixState(clean);
+    const ok = await persist({ quiz_mix: clean });
+    if (!ok) setQuizMixState(prev);
+    return ok;
+  }, [quizMix, persist]);
+
+  const value = useMemo(() => ({
+    hiddenNavItems, themeMode, notificationsEnabled, quizMix, loading,
+    setHiddenNavItems, toggleNavItem, setThemeMode, setNotificationsEnabled, setQuizMix,
+  }), [hiddenNavItems, themeMode, notificationsEnabled, quizMix, loading, setHiddenNavItems, toggleNavItem, setThemeMode, setNotificationsEnabled, setQuizMix]);
+
+  return <SettingsContext.Provider value={value}>{children}</SettingsContext.Provider>;
 }
 
 export function useSettings() {

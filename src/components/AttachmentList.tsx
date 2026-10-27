@@ -72,7 +72,8 @@ export function AttachmentList({ entityType, entityId }: Props) {
           )}
           <button
             onClick={() => handleDelete(a)}
-            className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-rose-500 text-white md:hidden md:group-hover:flex"
+            aria-label={`Remove ${a.file_name}`}
+            className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-rose-500 text-white hoverable:hidden hoverable:group-hover:flex hoverable:group-focus-within:flex"
           >
             <X size={12} />
           </button>
@@ -98,7 +99,7 @@ export function AttachmentList({ entityType, entityId }: Props) {
           fire a native file picker from a programmatic .click() on a
           display:none input; the standard visually-hidden-but-present
           pattern avoids that. */}
-      <input ref={fileInputRef} type="file" multiple className="sr-only" onChange={handleFiles} />
+      <input ref={fileInputRef} type="file" multiple className="sr-only" tabIndex={-1} aria-hidden="true" onChange={handleFiles} />
       <input
         ref={folderInputRef}
         type="file"
@@ -107,6 +108,8 @@ export function AttachmentList({ entityType, entityId }: Props) {
         webkitdirectory=""
         directory=""
         className="sr-only"
+        tabIndex={-1}
+        aria-hidden="true"
         onChange={handleFiles}
       />
     </div>

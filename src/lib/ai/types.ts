@@ -23,16 +23,18 @@ export interface AIChatResponse {
   message: string;
   insights: string[];
   suggestedActions: string[];
+  /** The saved conversation this exchange belongs to (absent when nothing was saved). */
+  conversationId?: string | null;
 }
 
-export interface AIQuizQuestion {
-  question_type: 'mcq' | 'short_answer' | 'explain' | 'scenario' | 'problem_solving' | 'reverse' | 'lateral' | 'cross_topic';
-  question: string;
-  options: string[];
-  correct_answer: string;
-  explanation: string;
-  topic: string;
-  difficulty: 'easy' | 'medium' | 'hard';
+export interface ChatOptions {
+  /**
+   * Which saved conversation to append to. `null` starts a new one; a string continues that one;
+   * leaving it out keeps the legacy behaviour (reuse the latest conversation if it is under 6 hours old).
+   */
+  conversationId?: string | null;
+  /** `false` answers without saving anything — for one-off questions (Ask Alora) that don't belong in chat history. */
+  persist?: boolean;
 }
 
 export interface AIClassSummary {
@@ -56,11 +58,6 @@ export interface AIReflection {
   suggestedActions: string[];
 }
 
-export interface AINovelCuration {
-  curatedContent: string;
-  aiSuggestions: { type: string; content: string }[];
-}
-
 export interface MemorySearchResult {
   memoryId: string;
   content: string;
@@ -70,12 +67,10 @@ export interface MemorySearchResult {
 
 export interface AIProvider {
   name: string;
-  chat(messages: ChatMessage[], context: ChatContext): Promise<AIChatResponse>;
-  generateQuiz(topics: string[], weakTopics: string[], mix: { recent: number; older: number; weak: number; upcoming: number; lateral: number }): Promise<AIQuizQuestion[]>;
+  chat(messages: ChatMessage[], context: ChatContext, options?: ChatOptions): Promise<AIChatResponse>;
   summarizeClass(rawInput: string): Promise<AIClassSummary>;
   extractTasks(rawInput: string): Promise<AITaskExtraction>;
   reflect(journalEntries: string[]): Promise<AIReflection>;
-  curateNovelScene(rawContent: string): Promise<AINovelCuration>;
   searchMemories(query: string, memories: { id: string; content: string; category: string }[]): Promise<MemorySearchResult[]>;
 }
 
@@ -126,8 +121,10 @@ export function detectEmotionalState(message: string): string[] {
 }
 
 export const CRISIS_RESOURCES = `If you're in immediate danger or having thoughts of self-harm, please reach out right now:
-- National Suicide Prevention Lifeline (US): 988 or 1-800-273-8255
-- Crisis Text Line: Text HOME to 741741
-- International: findahelpline.com
+- India — Tele-MANAS: call 14416 or 1800-891-4416 (free, 24/7, many languages)
+- India — KIRAN: call 1800-599-0019 (free, 24/7)
+- Emergency in India: 112
+- US: call or text 988 · Crisis Text Line: text HOME to 741741
+- Anywhere else: findahelpline.com
 
 You matter. Please talk to someone who can help right now.`;

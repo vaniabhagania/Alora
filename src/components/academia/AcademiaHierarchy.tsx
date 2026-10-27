@@ -4,15 +4,18 @@ import { useToast } from '@/lib/toast';
 import { aiProvider } from '@/lib/ai/provider';
 import { useSpeechRecognition } from '@/lib/useSpeechRecognition';
 import type { AcademicData } from '@/lib/academic';
-import type { Course, Module, Topic, ClassSession } from '@/lib/types';
+import type { Course, Module, Topic, ClassSession, ClassLog } from '@/lib/types';
+import { cascadeClassLog, cascadeClassEdit, cascadeClassDeletion } from '@/lib/brain';
 import { Modal } from '@/components/Modal';
+import { Field, inputClass } from '@/components/ui';
 import { EmptyState, PopoverMenu } from '@/components/ui';
 import {
   ChevronRight, ChevronDown, Plus, GraduationCap, FileText, Trash2,
   Pencil, Archive, ArchiveRestore, ArrowUp, ArrowDown, Sparkles, CheckSquare, Mic, MicOff,
 } from 'lucide-react';
 
-export type Level = 'year' | 'semester' | 'course' | 'module' | 'topic';
+import { countDeps, classIdsUnder, levelTable, type Level } from '@/components/academia/hierarchy';
+export type { Level };
 
 interface Props {
   data: AcademicData;
@@ -63,9 +66,10 @@ export function AcademiaHierarchy({ data, reload, onOpenCourse }: Props) {
 
   async function handleDelete() {
     if (!deleteTarget) return;
+    const doomedClasses = classIdsUnder(data, deleteTarget.level, deleteTarget.id);
     const { error } = await supabase.from(levelTable(deleteTarget.level)).delete().eq('id', deleteTarget.id);
     if (error) toast.show('Failed to delete.', 'error');
-    else { toast.show('Deleted permanently.'); reload(); }
+    else { await cascadeClassDeletion(doomedClasses); toast.show('Deleted permanently.'); reload(); }
     setDeleteTarget(null);
   }
 
@@ -118,7 +122,7 @@ export function AcademiaHierarchy({ data, reload, onOpenCourse }: Props) {
                   badge={`${yearSems.length} semesters`}
                   onClick={() => toggle(year.id)}
                   menu={
-                    <PopoverMenu items={[
+                    <PopoverMenu label={`Actions for ${year.label}`} items={[
                       { icon: <Plus size={14} />, label: 'Add Semester', onClick: () => setCreateModal({ level: 'semester', parentId: year.id, parentLabel: year.label }) },
                       { icon: <Pencil size={14} />, label: 'Edit Year', onClick: () => setEditModal({ level: 'year', id: year.id, label: year.label, startDate: year.start_date || '', endDate: year.end_date || '' }) },
                       { icon: <ArrowUp size={14} />, label: 'Move Up', onClick: () => handleReorder('year', year.id, 'up', yearSiblings) },
@@ -148,7 +152,7 @@ export function AcademiaHierarchy({ data, reload, onOpenCourse }: Props) {
                               onClick={() => toggle(sem.id)}
                               indent={1}
                               menu={
-                                <PopoverMenu items={[
+                                <PopoverMenu label={`Actions for ${sem.label}`} items={[
                                   { icon: <Plus size={14} />, label: 'Add Course', onClick: () => setCreateModal({ level: 'course', parentId: sem.id, parentLabel: sem.label }) },
                                   { icon: <Pencil size={14} />, label: 'Edit', onClick: () => setEditModal({ level: 'semester', id: sem.id, label: sem.label, startDate: sem.start_date || '', endDate: sem.end_date || '' }) },
                                   { icon: <ArrowUp size={14} />, label: 'Move Up', onClick: () => handleReorder('semester', sem.id, 'up', semSiblings) },
@@ -180,7 +184,7 @@ export function AcademiaHierarchy({ data, reload, onOpenCourse }: Props) {
                                           onClick={() => onOpenCourse(course.id)}
                                           indent={2}
                                           menu={
-                                            <PopoverMenu items={[
+                                            <PopoverMenu label={`Actions for ${course.name}`} items={[
                                               { icon: <Plus size={14} />, label: 'Add Module', onClick: () => setCreateModal({ level: 'module', parentId: course.id, parentLabel: course.name }) },
                                               { icon: <FileText size={14} />, label: 'Log Class', onClick: () => setLogClassModal({ courseId: course.id }) },
                                               { icon: <Pencil size={14} />, label: 'Edit Course', onClick: () => setEditModal({ level: 'course', id: course.id, name: course.name, description: course.description, professor: course.professor, code: course.course_code, color: course.color, semesterId: course.semester_id }) },
@@ -211,7 +215,7 @@ export function AcademiaHierarchy({ data, reload, onOpenCourse }: Props) {
                                                       onClick={() => toggle(mod.id)}
                                                       indent={3}
                                                       menu={
-                                                        <PopoverMenu items={[
+                                                        <PopoverMenu label={`Actions for ${mod.name}`} items={[
                                                           { icon: <Plus size={14} />, label: 'Add Topic', onClick: () => setCreateModal({ level: 'topic', parentId: mod.id, parentLabel: mod.name }) },
                                                           { icon: <Pencil size={14} />, label: 'Edit', onClick: () => setEditModal({ level: 'module', id: mod.id, name: mod.name, description: mod.description }) },
                                                           { icon: <ArrowUp size={14} />, label: 'Move Up', onClick: () => handleReorder('module', mod.id, 'up', modSiblings) },
@@ -294,39 +298,6 @@ export interface DeleteTarget {
   deps: { label: string; count: number }[];
 }
 
-export function countDeps(data: AcademicData, level: Level, id: string): { label: string; count: number }[] {
-  const deps: { label: string; count: number }[] = [];
-  if (level === 'year') {
-    const sems = data.semesters.filter((s) => s.academic_year_id === id);
-    if (sems.length) deps.push({ label: 'semesters', count: sems.length });
-    const semIds = sems.map((s) => s.id);
-    const courses = data.courses.filter((c) => semIds.includes(c.semester_id));
-    if (courses.length) deps.push({ label: 'courses', count: courses.length });
-  } else if (level === 'semester') {
-    const courses = data.courses.filter((c) => c.semester_id === id);
-    if (courses.length) deps.push({ label: 'courses', count: courses.length });
-    const courseIds = courses.map((c) => c.id);
-    const modules = data.modules.filter((m) => courseIds.includes(m.course_id));
-    if (modules.length) deps.push({ label: 'modules', count: modules.length });
-  } else if (level === 'course') {
-    const modules = data.modules.filter((m) => m.course_id === id);
-    if (modules.length) deps.push({ label: 'modules', count: modules.length });
-    const classes = data.classes.filter((c) => c.course_id === id);
-    if (classes.length) deps.push({ label: 'classes', count: classes.length });
-    const tasks = data.tasks.filter((t) => t.related_course_id === id);
-    if (tasks.length) deps.push({ label: 'tasks', count: tasks.length });
-  } else if (level === 'module') {
-    const topics = data.topics.filter((t) => t.module_id === id);
-    if (topics.length) deps.push({ label: 'topics', count: topics.length });
-  } else if (level === 'topic') {
-    const classes = data.classes.filter((c) => c.topic_id === id);
-    if (classes.length) deps.push({ label: 'classes', count: classes.length });
-  }
-  return deps;
-}
-
-// --- Delete modal with dependency info ---
-
 export function DeleteConfirmModal({ target, onClose, onConfirm, onArchive }: { target: DeleteTarget; onClose: () => void; onConfirm: () => void; onArchive: () => void }) {
   const hasDeps = target.deps.length > 0;
   return (
@@ -391,7 +362,7 @@ function TopicRow({ topic, classCount, onEdit, onArchive, onUnarchive, onDelete 
       {topic.is_weak && <span className="text-xs font-medium text-rose-400">Weak</span>}
       {topic.is_strong && <span className="text-xs font-medium text-emerald-400">Strong</span>}
       <div className="flex shrink-0 items-center">
-        <PopoverMenu items={[
+        <PopoverMenu label={`Actions for ${topic.name}`} items={[
           { icon: <Pencil size={14} />, label: 'Edit', onClick: onEdit },
           ...(topic.archived
             ? [{ icon: <ArchiveRestore size={14} />, label: 'Restore', onClick: onUnarchive }]
@@ -442,12 +413,6 @@ function HierarchyRow({ icon, label, sublabel, badge, color, indent = 0, onClick
   );
 }
 
-// --- Helpers ---
-
-export function levelTable(level: Level): string {
-  return { year: 'academic_years', semester: 'semesters', course: 'courses', module: 'modules', topic: 'topics' }[level];
-}
-
 // --- Edit modal data type ---
 
 export interface EditModalData {
@@ -468,6 +433,19 @@ export interface EditModalData {
 
 // --- Create entity modal ---
 
+const COURSE_COLORS = ['#6366f1', '#10b981', '#f97316', '#0ea5e9', '#e11d48', '#e5e5e5'];
+
+function ColorPicker({ value, onChange }: { value: string; onChange: (c: string) => void }) {
+  return (
+    <div role="radiogroup" aria-label="Course color" className="flex gap-2">
+      {COURSE_COLORS.map((c) => (
+        <button key={c} type="button" role="radio" aria-checked={value === c} aria-label={`Color ${c}`} onClick={() => onChange(c)}
+          className={`h-8 w-8 rounded-lg transition-transform ${value === c ? 'scale-110 ring-2 ring-[var(--accent)]' : ''}`} style={{ background: c }} />
+      ))}
+    </div>
+  );
+}
+
 export function CreateEntityModal({ level, parentId, parentLabel, data, onClose, onCreated }: {
   level: Level;
   parentId?: string;
@@ -478,6 +456,7 @@ export function CreateEntityModal({ level, parentId, parentLabel, data, onClose,
 }) {
   const toast = useToast();
   const [name, setName] = useState('');
+  const [nameError, setNameError] = useState<string | null>(null);
   const [code, setCode] = useState('');
   const [professor, setProfessor] = useState('');
   const [description, setDescription] = useState('');
@@ -487,45 +466,47 @@ export function CreateEntityModal({ level, parentId, parentLabel, data, onClose,
   const titles: Record<Level, string> = { year: 'Academic Year', semester: 'Semester', course: 'Course', module: 'Module', topic: 'Topic' };
 
   async function handleCreate() {
-    if (!name.trim() && level !== 'year') { toast.show('Please enter a name.', 'error'); return; }
+    if (saving) return;
+    const clean = name.trim();
+    if (!clean && level !== 'year' && level !== 'semester') { setNameError('Give it a name.'); return; }
     setSaving(true);
     const table = levelTable(level);
     const d: Record<string, unknown> = {};
-    if (level === 'year') { d.label = name || 'Year 1'; d.position = (data.years.length + 1); }
-    else if (level === 'semester') { d.academic_year_id = parentId; d.label = name || 'Semester 1'; d.position = (data.semesters.filter((s) => s.academic_year_id === parentId).length + 1); }
-    else if (level === 'course') { d.semester_id = parentId; d.name = name; d.course_code = code; d.professor = professor; d.description = description; d.color = color; }
-    else if (level === 'module') { d.course_id = parentId; d.name = name; d.description = description; d.position = (data.modules.filter((m) => m.course_id === parentId).length + 1); }
-    else if (level === 'topic') { d.module_id = parentId; d.name = name; }
+    if (level === 'year') { d.label = clean || `Year ${data.years.length + 1}`; d.position = (data.years.length + 1); }
+    else if (level === 'semester') { const n = data.semesters.filter((s) => s.academic_year_id === parentId).length + 1; d.academic_year_id = parentId; d.label = clean || `Semester ${n}`; d.position = n; }
+    else if (level === 'course') { d.semester_id = parentId; d.name = clean; d.course_code = code.trim(); d.professor = professor.trim(); d.description = description.trim(); d.color = color; }
+    else if (level === 'module') { d.course_id = parentId; d.name = clean; d.description = description.trim(); d.position = (data.modules.filter((m) => m.course_id === parentId).length + 1); }
+    else if (level === 'topic') { d.module_id = parentId; d.name = clean; }
     const { error } = await supabase.from(table).insert(d);
     setSaving(false);
-    if (error) toast.show('Failed to create.', 'error');
+    if (error) toast.show("Couldn't create that. Your details are still here — try again.", 'error');
     else { toast.show(`${titles[level]} created.`); onCreated(); }
   }
 
+  const nameLabel = level === 'year' || level === 'semester' ? 'Label' : 'Name';
   return (
     <Modal open={true} onClose={onClose} title={`New ${titles[level]}`}>
-      <div className="space-y-4">
+      <form onSubmit={(e) => { e.preventDefault(); handleCreate(); }} noValidate className="space-y-4">
         {parentLabel && <p className="text-sm text-[var(--text-secondary)]">Adding to: {parentLabel}</p>}
-        <div>
-          <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">{level === 'year' || level === 'semester' ? 'Label' : 'Name'}</label>
-          <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder={level === 'year' ? 'Year 1' : level === 'semester' ? 'Semester 1' : 'Enter name...'} className="w-full rounded-xl border border-ink/10 bg-ink/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50" />
-        </div>
+        <Field label={nameLabel} error={nameError}>
+          {(id) => <input id={id} type="text" autoFocus value={name} onChange={(e) => { setName(e.target.value); setNameError(null); }} placeholder={level === 'year' ? 'Year 1' : level === 'semester' ? 'Semester 1' : 'Enter name...'} className={inputClass} />}
+        </Field>
         {level === 'course' && (
           <>
             <div className="grid grid-cols-2 gap-3">
-              <div><label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Course Code</label><input type="text" value={code} onChange={(e) => setCode(e.target.value)} placeholder="CS101" className="w-full rounded-xl border border-ink/10 bg-ink/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50" /></div>
-              <div><label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Professor</label><input type="text" value={professor} onChange={(e) => setProfessor(e.target.value)} placeholder="Dr. Smith" className="w-full rounded-xl border border-ink/10 bg-ink/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50" /></div>
+              <Field label="Course Code">{(id) => <input id={id} type="text" value={code} onChange={(e) => setCode(e.target.value)} placeholder="CS101" className={inputClass} />}</Field>
+              <Field label="Professor">{(id) => <input id={id} type="text" value={professor} onChange={(e) => setProfessor(e.target.value)} placeholder="Dr. Smith" className={inputClass} />}</Field>
             </div>
-            <div><label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Description</label><textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Brief course description..." rows={2} className="w-full rounded-xl border border-ink/10 bg-ink/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50" /></div>
-            <div><label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Color</label><div className="flex gap-2">{['#6366f1', '#10b981', '#f97316', '#0ea5e9', '#e11d48', '#e5e5e5'].map((c) => <button key={c} onClick={() => setColor(c)} className={`h-8 w-8 rounded-lg transition-transform ${color === c ? 'scale-110 ring-2 ring-white/30' : ''}`} style={{ background: c }} />)}</div></div>
+            <Field label="Description">{(id) => <textarea id={id} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Brief course description..." rows={2} className={inputClass} />}</Field>
+            <div><p className="mb-1.5 text-xs font-medium text-[var(--text-secondary)]">Color</p><ColorPicker value={color} onChange={setColor} /></div>
           </>
         )}
-        {level === 'module' && <div><label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Description</label><textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Brief module description..." rows={2} className="w-full rounded-xl border border-ink/10 bg-ink/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50" /></div>}
+        {level === 'module' && <Field label="Description">{(id) => <textarea id={id} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Brief module description..." rows={2} className={inputClass} />}</Field>}
         <div className="flex justify-end gap-3">
-          <button onClick={onClose} className="rounded-xl px-4 py-2 text-sm font-medium text-[var(--text-secondary)] hover:bg-ink/5">Cancel</button>
-          <button onClick={handleCreate} disabled={saving} className="btn-primary px-5 py-2 text-sm">{saving ? 'Creating...' : 'Create'}</button>
+          <button type="button" onClick={onClose} className="rounded-xl px-4 py-2 text-sm font-medium text-[var(--text-secondary)] hover:bg-ink/5">Cancel</button>
+          <button type="submit" disabled={saving} className="btn-primary px-5 py-2 text-sm">{saving ? 'Creating...' : 'Create'}</button>
         </div>
-      </div>
+      </form>
     </Modal>
   );
 }
@@ -546,6 +527,7 @@ export function EditEntityModal({ data: editData, allData, onClose, onSaved }: {
   const [confidence, setConfidence] = useState(editData.confidence ?? 50);
   const [status, setStatus] = useState(editData.status || 'not_started');
   const [saving, setSaving] = useState(false);
+  const [valError, setValError] = useState<string | null>(null);
 
   const titles: Record<Level, string> = { year: 'Year', semester: 'Semester', course: 'Course', module: 'Module', topic: 'Topic' };
   const statusOptions: { value: string; label: string }[] = [
@@ -558,33 +540,38 @@ export function EditEntityModal({ data: editData, allData, onClose, onSaved }: {
   ];
 
   async function handleSave() {
+    if (saving) return;
+    const clean = val.trim();
+    if (!clean) { setValError('The name can\'t be empty.'); return; }
     setSaving(true);
     const table = levelTable(level);
     const d: Record<string, unknown> = {};
     if (level === 'year' || level === 'semester') {
-      d.label = val;
+      d.label = clean;
       d.start_date = startDate || null;
       d.end_date = endDate || null;
     } else {
-      d.name = val;
+      d.name = clean;
     }
     if (level === 'course') {
-      d.professor = prof;
-      d.course_code = cCode;
-      d.description = desc;
+      d.professor = prof.trim();
+      d.course_code = cCode.trim();
+      d.description = desc.trim();
       d.color = color;
       if (semId) d.semester_id = semId;
     }
-    if (level === 'module' || level === 'topic') d.description = desc;
+    if (level === 'module' || level === 'topic') d.description = desc.trim();
     if (level === 'topic') {
       d.confidence = confidence;
       d.status = status;
-      d.is_weak = confidence < 50;
-      d.is_strong = status === 'mastered' || status === 'strong';
+      // The weak/strong flags follow what the student changed here — editing just the name must not wipe a
+      // flag that came from somewhere else (a class they rated 2/5, a quiz they missed).
+      if (confidence !== (editData.confidence ?? 50)) d.is_weak = confidence < 50;
+      if (status !== (editData.status || 'not_started')) d.is_strong = status === 'mastered' || status === 'strong';
     }
     const { error } = await supabase.from(table).update(d).eq('id', id);
     setSaving(false);
-    if (error) toast.show('Failed to save.', 'error');
+    if (error) toast.show("Couldn't save. Your changes are still here — try again.", 'error');
     else { toast.show('Saved.'); onSaved(); }
   }
 
@@ -592,89 +579,86 @@ export function EditEntityModal({ data: editData, allData, onClose, onSaved }: {
 
   return (
     <Modal open={true} onClose={onClose} title={`Edit ${titles[level]}`}>
-      <div className="space-y-4">
-        <div>
-          <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">{level === 'year' || level === 'semester' ? 'Label' : 'Name'}</label>
-          <input type="text" value={val} onChange={(e) => setVal(e.target.value)} className="w-full rounded-xl border border-ink/10 bg-ink/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] focus:border-[var(--accent)]/50" />
-        </div>
+      <form onSubmit={(e) => { e.preventDefault(); handleSave(); }} noValidate className="space-y-4">
+        <Field label={level === 'year' || level === 'semester' ? 'Label' : 'Name'} error={valError}>
+          {(fid) => <input id={fid} type="text" autoFocus value={val} onChange={(e) => { setVal(e.target.value); setValError(null); }} className={inputClass} />}
+        </Field>
         {(level === 'year' || level === 'semester') && (
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Start Date</label>
-              <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full rounded-xl border border-ink/10 bg-ink/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] focus:border-[var(--accent)]/50" />
-            </div>
-            <div>
-              <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">End Date</label>
-              <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full rounded-xl border border-ink/10 bg-ink/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] focus:border-[var(--accent)]/50" />
-            </div>
+            <Field label="Start Date">{(fid) => <input id={fid} type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className={inputClass} />}</Field>
+            <Field label="End Date">{(fid) => <input id={fid} type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className={inputClass} />}</Field>
           </div>
         )}
         {level === 'course' && (
           <>
             <div className="grid grid-cols-2 gap-3">
-              <div><label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Course Code</label><input type="text" value={cCode} onChange={(e) => setCCode(e.target.value)} className="w-full rounded-xl border border-ink/10 bg-ink/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] focus:border-[var(--accent)]/50" /></div>
-              <div><label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Professor</label><input type="text" value={prof} onChange={(e) => setProf(e.target.value)} className="w-full rounded-xl border border-ink/10 bg-ink/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] focus:border-[var(--accent)]/50" /></div>
+              <Field label="Course Code">{(fid) => <input id={fid} type="text" value={cCode} onChange={(e) => setCCode(e.target.value)} className={inputClass} />}</Field>
+              <Field label="Professor">{(fid) => <input id={fid} type="text" value={prof} onChange={(e) => setProf(e.target.value)} className={inputClass} />}</Field>
             </div>
-            <div>
-              <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Semester</label>
-              <select value={semId} onChange={(e) => setSemId(e.target.value)} className="w-full rounded-xl border border-ink/10 bg-ink/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] focus:border-[var(--accent)]/50">
-                <option value="">Keep current</option>
-                {availableSemesters.map((s) => {
-                  const year = allData.years.find((y) => y.id === s.academic_year_id);
-                  return <option key={s.id} value={s.id}>{year?.label} — {s.label}</option>;
-                })}
-              </select>
-            </div>
-            <div><label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Description</label><textarea value={desc} onChange={(e) => setDesc(e.target.value)} rows={2} className="w-full rounded-xl border border-ink/10 bg-ink/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] focus:border-[var(--accent)]/50" /></div>
-            <div><label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Color</label><div className="flex gap-2">{['#6366f1', '#10b981', '#f97316', '#0ea5e9', '#e11d48', '#e5e5e5'].map((c) => <button key={c} onClick={() => setColor(c)} className={`h-8 w-8 rounded-lg transition-transform ${color === c ? 'scale-110 ring-2 ring-white/30' : ''}`} style={{ background: c }} />)}</div></div>
+            <Field label="Semester">
+              {(fid) => (
+                <select id={fid} value={semId} onChange={(e) => setSemId(e.target.value)} className={inputClass}>
+                  <option value="">Keep current</option>
+                  {availableSemesters.map((s) => {
+                    const year = allData.years.find((y) => y.id === s.academic_year_id);
+                    return <option key={s.id} value={s.id}>{year?.label} — {s.label}</option>;
+                  })}
+                </select>
+              )}
+            </Field>
+            <Field label="Description">{(fid) => <textarea id={fid} value={desc} onChange={(e) => setDesc(e.target.value)} rows={2} className={inputClass} />}</Field>
+            <div><p className="mb-1.5 text-xs font-medium text-[var(--text-secondary)]">Color</p><ColorPicker value={color} onChange={setColor} /></div>
           </>
         )}
-        {level === 'module' && <div><label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Description</label><textarea value={desc} onChange={(e) => setDesc(e.target.value)} rows={2} className="w-full rounded-xl border border-ink/10 bg-ink/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] focus:border-[var(--accent)]/50" /></div>}
+        {level === 'module' && <Field label="Description">{(fid) => <textarea id={fid} value={desc} onChange={(e) => setDesc(e.target.value)} rows={2} className={inputClass} />}</Field>}
         {level === 'topic' && (
           <>
-            <div><label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Description</label><textarea value={desc} onChange={(e) => setDesc(e.target.value)} rows={2} className="w-full rounded-xl border border-ink/10 bg-ink/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] focus:border-[var(--accent)]/50" /></div>
-            <div>
-              <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Understanding Status</label>
-              <select value={status} onChange={(e) => setStatus(e.target.value)} className="w-full rounded-xl border border-ink/10 bg-ink/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] focus:border-[var(--accent)]/50">
-                {statusOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Confidence: {confidence}%</label>
-              <input type="range" min={0} max={100} value={confidence} onChange={(e) => setConfidence(Number(e.target.value))} className="w-full accent-[var(--accent)]" />
-            </div>
+            <Field label="Description">{(fid) => <textarea id={fid} value={desc} onChange={(e) => setDesc(e.target.value)} rows={2} className={inputClass} />}</Field>
+            <Field label="Understanding Status">
+              {(fid) => (
+                <select id={fid} value={status} onChange={(e) => setStatus(e.target.value)} className={inputClass}>
+                  {statusOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                </select>
+              )}
+            </Field>
+            <Field label={`Confidence: ${confidence}%`}>
+              {(fid) => <input id={fid} type="range" min={0} max={100} value={confidence} onChange={(e) => setConfidence(Number(e.target.value))} className="w-full accent-[var(--accent)]" />}
+            </Field>
           </>
         )}
         <div className="flex justify-end gap-3">
-          <button onClick={onClose} className="rounded-xl px-4 py-2 text-sm font-medium text-[var(--text-secondary)] hover:bg-ink/5">Cancel</button>
-          <button onClick={handleSave} disabled={saving} className="btn-primary px-5 py-2 text-sm">{saving ? 'Saving...' : 'Save'}</button>
+          <button type="button" onClick={onClose} className="rounded-xl px-4 py-2 text-sm font-medium text-[var(--text-secondary)] hover:bg-ink/5">Cancel</button>
+          <button type="submit" disabled={saving} className="btn-primary px-5 py-2 text-sm">{saving ? 'Saving...' : 'Save'}</button>
         </div>
-      </div>
+      </form>
     </Modal>
   );
 }
 
 // --- Log class modal (preserved from Phase 1) ---
 
-export function LogClassModal({ courses, modules, topics, defaultCourseId, onClose, onLogged }: {
+export function LogClassModal({ courses, modules, topics, defaultCourseId, editing, onClose, onLogged }: {
   courses: Course[];
   modules: Module[];
   topics: Topic[];
   defaultCourseId?: string;
+  /** When given, the modal edits this already-logged class instead of logging a new one. */
+  editing?: { cls: ClassSession; log: ClassLog | null };
   onClose: () => void;
   onLogged: () => void;
 }) {
   const toast = useToast();
-  const [selectedCourse, setSelectedCourse] = useState(defaultCourseId || '');
-  const [selectedTopic, setSelectedTopic] = useState('');
-  const [title, setTitle] = useState('');
-  const [rawThoughts, setRawThoughts] = useState('');
-  const [understanding, setUnderstanding] = useState(3);
-  const [usefulness, setUsefulness] = useState(3);
-  const [questions, setQuestions] = useState('');
-  const [confusions, setConfusions] = useState('');
-  const [learnings, setLearnings] = useState('');
+  const [selectedCourse, setSelectedCourse] = useState(editing?.cls.course_id || defaultCourseId || '');
+  const [selectedTopic, setSelectedTopic] = useState(editing?.cls.topic_id || '');
+  const [title, setTitle] = useState(editing ? editing.cls.title : '');
+  const [rawThoughts, setRawThoughts] = useState(editing?.log?.raw_thoughts || '');
+  const [understanding, setUnderstanding] = useState(editing?.log?.understanding_rating ?? 3);
+  const [usefulness, setUsefulness] = useState(editing?.log?.usefulness_rating ?? 3);
+  const [questions, setQuestions] = useState((editing?.log?.questions || []).join('\n'));
+  const [confusions, setConfusions] = useState((editing?.log?.confusions || []).join('\n'));
+  const [learnings, setLearnings] = useState((editing?.log?.learnings || []).join('\n'));
   const [saving, setSaving] = useState(false);
+  const [errors, setErrors] = useState<{ course?: string; thoughts?: string }>({});
   const [summarizing, setSummarizing] = useState(false);
   const [suggestedTasks, setSuggestedTasks] = useState<{ title: string; deadline: string; priority: string; category: string }[]>([]);
   const [addingTasks, setAddingTasks] = useState(false);
@@ -738,67 +722,113 @@ export function LogClassModal({ courses, modules, topics, defaultCourseId, onClo
   }
 
   async function handleLog() {
-    if (!selectedCourse) { toast.show('Please select a course.', 'error'); return; }
-    if (!rawThoughts.trim()) { toast.show('Please write something about the class.', 'error'); return; }
+    if (saving) return;
+    const next = {
+      course: selectedCourse ? undefined : 'Pick the course this class was for.',
+      thoughts: rawThoughts.trim() ? undefined : 'Write a few words about the class — anything counts.',
+    };
+    setErrors(next);
+    if (next.course || next.thoughts) return;
     setSaving(true);
-    const { data: classData, error: classError } = await supabase.from('classes').insert({ course_id: selectedCourse, topic_id: selectedTopic || null, title: title || 'Class Session', session_date: new Date().toISOString() }).select('*').maybeSingle();
-    if (classError || !classData) { toast.show('Failed to log class.', 'error'); setSaving(false); return; }
-    const { error: logError } = await supabase.from('class_logs').insert({
-      class_id: (classData as ClassSession).id, raw_thoughts: rawThoughts, understanding_rating: understanding, usefulness_rating: usefulness,
-      questions: questions ? questions.split('\n').filter(Boolean) : [], confusions: confusions ? confusions.split('\n').filter(Boolean) : [], learnings: learnings ? learnings.split('\n').filter(Boolean) : [],
-    });
-    if (selectedTopic) {
-      await supabase.from('topics').update({ last_studied: new Date().toISOString(), review_count: (topics.find((t) => t.id === selectedTopic)?.review_count || 0) + 1 }).eq('id', selectedTopic);
+    const course = courses.find((c) => c.id === selectedCourse);
+    const topic = topics.find((t) => t.id === selectedTopic) || null;
+    const lines = (text: string) => text.split('\n').map((l) => l.trim()).filter(Boolean);
+    const classTitle = title.trim() || 'Class Session';
+
+    if (editing) {
+      const { error: clsErr } = await supabase.from('classes').update({ title: classTitle, topic_id: selectedTopic || null }).eq('id', editing.cls.id);
+      const logFields = { raw_thoughts: rawThoughts, understanding_rating: understanding, usefulness_rating: usefulness, questions: lines(questions), confusions: lines(confusions), learnings: lines(learnings) };
+      const { error: logErr } = editing.log
+        ? await supabase.from('class_logs').update(logFields).eq('id', editing.log.id)
+        : await supabase.from('class_logs').insert({ class_id: editing.cls.id, ...logFields });
+      if (clsErr || logErr) { setSaving(false); toast.show("Couldn't save your changes. Your text is still here — try again.", 'error'); return; }
+      const synced = await cascadeClassEdit({
+        classId: editing.cls.id, courseId: selectedCourse, courseName: course?.name || 'Course', topic: topic && { id: topic.id, name: topic.name, status: topic.status, review_count: topic.review_count },
+        title: classTitle, rawThoughts, understanding, questions: lines(questions), confusions: lines(confusions), learnings: lines(learnings),
+      });
+      setSaving(false);
+      toast.show(synced ? 'Class updated.' : "Class updated, but ALORA couldn't refresh what it remembers from it.", synced ? 'success' : 'info');
+      onLogged();
+      return;
     }
+
+    const { data: classData, error: classError } = await supabase.from('classes').insert({ course_id: selectedCourse, topic_id: selectedTopic || null, title: classTitle, session_date: new Date().toISOString() }).select('*').maybeSingle();
+    if (classError || !classData) { toast.show('Failed to log class.', 'error'); setSaving(false); return; }
+    const classId = (classData as ClassSession).id;
+    const { error: logError } = await supabase.from('class_logs').insert({
+      class_id: classId, raw_thoughts: rawThoughts, understanding_rating: understanding, usefulness_rating: usefulness,
+      questions: lines(questions), confusions: lines(confusions), learnings: lines(learnings),
+    });
+    if (logError) {
+      // Don't leave a class with no notes behind: it would show up as "logged" while holding nothing.
+      await supabase.from('classes').delete().eq('id', classId);
+      setSaving(false);
+      toast.show("Couldn't save your class notes, so nothing was logged. Your text is still here — try again.", 'error');
+      return;
+    }
+
+    // Ripple into the shared brain: activity event, the topic studied, and a memory of what was learned.
+    const outcome = await cascadeClassLog({
+      classId, courseId: selectedCourse, courseName: course?.name || 'Course', topic: topic && { id: topic.id, name: topic.name, status: topic.status, review_count: topic.review_count },
+      title: classTitle, rawThoughts, understanding, questions: lines(questions), confusions: lines(confusions), learnings: lines(learnings),
+    });
     setSaving(false);
-    if (logError) toast.show('Failed to save class log.', 'error');
-    else { toast.show('Class logged.'); onLogged(); }
+    const partial = !outcome.eventRecorded || outcome.topicUpdated === false || !outcome.memoryCreated;
+    toast.show(partial ? 'Class logged, but ALORA couldn\'t update everything it learns from — your notes are safe.' : 'Class logged and added to your memory.', partial ? 'info' : 'success');
+    onLogged();
   }
 
   return (
-    <Modal open={true} onClose={onClose} title="Log a Class" maxWidth="600px">
+    <Modal open={true} onClose={onClose} title={editing ? 'Edit Class' : 'Log a Class'} maxWidth="600px">
       <div className="space-y-4">
-        <div>
-          <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Course</label>
-          <select value={selectedCourse} onChange={(e) => { setSelectedCourse(e.target.value); setSelectedTopic(''); }} className="w-full rounded-xl border border-ink/10 bg-ink/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] focus:border-[var(--accent)]/50">
-            <option value="">Select a course...</option>
-            {courses.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
-        </div>
-        {selectedCourse && courseTopics.length > 0 && (
-          <div>
-            <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Topic (optional)</label>
-            <select value={selectedTopic} onChange={(e) => setSelectedTopic(e.target.value)} className="w-full rounded-xl border border-ink/10 bg-ink/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] focus:border-[var(--accent)]/50">
-              <option value="">No specific topic...</option>
-              {courseTopics.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+        <Field label="Course" error={errors.course}>
+          {(id) => (
+            <select id={id} value={selectedCourse} disabled={!!editing} onChange={(e) => { setSelectedCourse(e.target.value); setSelectedTopic(''); setErrors((p) => ({ ...p, course: undefined })); }} className={`${inputClass} disabled:opacity-60`}>
+              <option value="">Select a course...</option>
+              {courses.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
-          </div>
+          )}
+        </Field>
+        {selectedCourse && courseTopics.length > 0 && (
+          <Field label="Topic (optional)">
+            {(id) => (
+              <select id={id} value={selectedTopic} onChange={(e) => setSelectedTopic(e.target.value)} className={inputClass}>
+                <option value="">No specific topic...</option>
+                {courseTopics.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+              </select>
+            )}
+          </Field>
         )}
-        <div><label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Title (optional)</label><input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Lecture on Hypothesis Testing" className="w-full rounded-xl border border-ink/10 bg-ink/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50" /></div>
-        <div>
-          <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Your raw thoughts</label>
-          <textarea value={rawThoughts} onChange={(e) => setRawThoughts(e.target.value)} placeholder="Just talk naturally. What happened? What did you learn? What confused you?" rows={5} className="w-full rounded-xl border border-ink/10 bg-ink/[0.03] px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50" />
-          <div className="mt-1.5 flex items-center justify-between">
-            <p className="text-xs text-[var(--text-secondary)]/60">
-              {speech.isListening ? 'Listening... tap the mic again to stop.' : 'Your original words are preserved forever.'}
-            </p>
-            <div className="flex items-center gap-1">
-              {speech.isSupported && (
-                <button
-                  type="button"
-                  onClick={handleToggleVoiceCapture}
-                  title={speech.isListening ? 'Stop voice capture' : 'Capture by speaking'}
-                  className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium hover:bg-[var(--accent)]/10 ${speech.isListening ? 'text-rose-400' : 'text-[var(--accent-secondary)]'}`}
-                >
-                  {speech.isListening ? <MicOff size={12} /> : <Mic size={12} />} {speech.isListening ? 'Stop' : 'Speak'}
-                </button>
-              )}
-              <button type="button" onClick={handleSummarize} disabled={summarizing || !rawThoughts.trim()} className="flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium text-[var(--accent-secondary)] hover:bg-[var(--accent)]/10 disabled:opacity-40">
-                <Sparkles size={12} /> {summarizing ? 'Summarizing...' : 'Summarize with AI'}
-              </button>
-            </div>
-          </div>
-        </div>
+        <Field label="Title (optional)">
+          {(id) => <input id={id} type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Lecture on Hypothesis Testing" className={inputClass} />}
+        </Field>
+        <Field label="Your raw thoughts" error={errors.thoughts}>
+          {(id) => (
+            <>
+              <textarea id={id} value={rawThoughts} onChange={(e) => { setRawThoughts(e.target.value); setErrors((p) => ({ ...p, thoughts: undefined })); }} placeholder="Just talk naturally. What happened? What did you learn? What confused you?" rows={5} className={inputClass} />
+              <div className="mt-1.5 flex items-center justify-between">
+                <p className="text-xs text-[var(--text-secondary)]/60">
+                  {speech.isListening ? 'Listening... tap the mic again to stop.' : 'Your original words are preserved forever.'}
+                </p>
+                <div className="flex items-center gap-1">
+                  {speech.isSupported && (
+                    <button
+                      type="button"
+                      onClick={handleToggleVoiceCapture}
+                      title={speech.isListening ? 'Stop voice capture' : 'Capture by speaking'}
+                      className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium hover:bg-[var(--accent)]/10 ${speech.isListening ? 'text-rose-400' : 'text-[var(--accent-secondary)]'}`}
+                    >
+                      {speech.isListening ? <MicOff size={12} /> : <Mic size={12} />} {speech.isListening ? 'Stop' : 'Speak'}
+                    </button>
+                  )}
+                  <button type="button" onClick={handleSummarize} disabled={summarizing || !rawThoughts.trim()} className="flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium text-[var(--accent-secondary)] hover:bg-[var(--accent)]/10 disabled:opacity-40">
+                    <Sparkles size={12} /> {summarizing ? 'Summarizing...' : 'Summarize with AI'}
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
+        </Field>
         {suggestedTasks.length > 0 && (
           <div className="rounded-xl border border-[var(--accent)]/15 bg-[var(--accent)]/5 p-3">
             <p className="mb-2 flex items-center gap-1.5 text-xs font-medium text-[var(--accent-secondary)]"><CheckSquare size={12} /> AI found {suggestedTasks.length} possible task(s) — review before adding</p>
@@ -816,17 +846,27 @@ export function LogClassModal({ courses, modules, topics, defaultCourseId, onClo
           </div>
         )}
         <div className="grid grid-cols-2 gap-4">
-          <div><label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Understanding: {understanding}/5</label><input type="range" min={1} max={5} value={understanding} onChange={(e) => setUnderstanding(Number(e.target.value))} className="w-full accent-[var(--accent)]" /></div>
-          <div><label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Usefulness: {usefulness}/5</label><input type="range" min={1} max={5} value={usefulness} onChange={(e) => setUsefulness(Number(e.target.value))} className="w-full accent-[var(--accent)]" /></div>
+          <Field label={`Understanding: ${understanding}/5`}>
+            {(id) => <input id={id} type="range" min={1} max={5} value={understanding} onChange={(e) => setUnderstanding(Number(e.target.value))} className="w-full accent-[var(--accent)]" />}
+          </Field>
+          <Field label={`Usefulness: ${usefulness}/5`}>
+            {(id) => <input id={id} type="range" min={1} max={5} value={usefulness} onChange={(e) => setUsefulness(Number(e.target.value))} className="w-full accent-[var(--accent)]" />}
+          </Field>
         </div>
         <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-          <div><label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Questions</label><textarea value={questions} onChange={(e) => setQuestions(e.target.value)} rows={3} placeholder="What is..." className="w-full rounded-xl border border-ink/10 bg-ink/[0.03] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50" /></div>
-          <div><label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Confusions</label><textarea value={confusions} onChange={(e) => setConfusions(e.target.value)} rows={3} placeholder="I didn't get..." className="w-full rounded-xl border border-ink/10 bg-ink/[0.03] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50" /></div>
-          <div><label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Learnings</label><textarea value={learnings} onChange={(e) => setLearnings(e.target.value)} rows={3} placeholder="I learned..." className="w-full rounded-xl border border-ink/10 bg-ink/[0.03] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)]/50" /></div>
+          <Field label="Questions" hint="One per line">
+            {(id) => <textarea id={id} value={questions} onChange={(e) => setQuestions(e.target.value)} rows={3} placeholder="What is..." className={inputClass} />}
+          </Field>
+          <Field label="Confusions" hint="One per line">
+            {(id) => <textarea id={id} value={confusions} onChange={(e) => setConfusions(e.target.value)} rows={3} placeholder="I didn't get..." className={inputClass} />}
+          </Field>
+          <Field label="Learnings" hint="One per line">
+            {(id) => <textarea id={id} value={learnings} onChange={(e) => setLearnings(e.target.value)} rows={3} placeholder="I learned..." className={inputClass} />}
+          </Field>
         </div>
         <div className="flex justify-end gap-3">
           <button onClick={onClose} className="rounded-xl px-4 py-2 text-sm font-medium text-[var(--text-secondary)] hover:bg-ink/5">Cancel</button>
-          <button onClick={handleLog} disabled={saving} className="btn-primary px-5 py-2 text-sm">{saving ? 'Saving...' : 'Log Class'}</button>
+          <button onClick={handleLog} disabled={saving} className="btn-primary px-5 py-2 text-sm">{saving ? 'Saving...' : editing ? 'Save changes' : 'Log Class'}</button>
         </div>
       </div>
     </Modal>
