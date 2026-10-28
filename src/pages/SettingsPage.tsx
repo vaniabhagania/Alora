@@ -9,6 +9,7 @@ import { runSystemHealthCheck, type SystemHealthReport } from '@/lib/systemHealt
 import { collectUserData, downloadJson } from '@/lib/exportData';
 import { DEFAULT_QUIZ_MIX, QUIZ_MIX_LABELS, type QuizMix } from '@/lib/quizMix';
 import { Toggle } from '@/components/ui';
+import { pushSupport, isPushOn, enablePush, disablePush } from '@/lib/push';
 import { Globe, User, Bell, Brain, Download, Shield, LogOut, ArrowRight, LayoutGrid, Sun, Moon, Activity, CheckCircle2, XCircle, AlertTriangle, SlidersHorizontal } from 'lucide-react';
 
 interface SettingsPageProps {
@@ -16,9 +17,9 @@ interface SettingsPageProps {
 }
 
 export function SettingsPage({ onNavigate }: SettingsPageProps) {
-  const { profile, refreshProfile, signOut } = useAuth();
+  const { user, profile, refreshProfile, signOut } = useAuth();
   const { activeWorld, worlds, deactivateWorld } = useWorlds();
-  const { hiddenNavItems, toggleNavItem, themeMode, setThemeMode, notificationsEnabled, setNotificationsEnabled, quizMix, setQuizMix } = useSettings();
+  const { hiddenNavItems, toggleNavItem, themeMode, setThemeMode, notificationsEnabled, setNotificationsEnabled, emailRemindersEnabled, setEmailRemindersEnabled, quizMix, setQuizMix } = useSettings();
   const toast = useToast();
   const [displayName, setDisplayName] = useState(profile?.display_name || '');
   const [phase, setPhase] = useState(profile?.current_phase || '');
@@ -28,6 +29,10 @@ export function SettingsPage({ onNavigate }: SettingsPageProps) {
   const [healthReport, setHealthReport] = useState<SystemHealthReport | null>(null);
   const [checkingHealth, setCheckingHealth] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [pushOn, setPushOn] = useState(false);
+  const [pushBusy, setPushBusy] = useState(false);
+  const support = pushSupport();
+  useEffect(() => { let live = true; isPushOn().then((on) => { if (live) setPushOn(on); }); return () => { live = false; }; }, []);
   const [draftMix, setDraftMix] = useState<QuizMix>(quizMix);
   const [instructionsLoaded, setInstructionsLoaded] = useState(false);
   useEffect(() => { setDraftMix(quizMix); }, [quizMix]);
@@ -120,6 +125,20 @@ export function SettingsPage({ onNavigate }: SettingsPageProps) {
   }
   async function changeNotifications(on: boolean) {
     if (!(await setNotificationsEnabled(on))) toast.show("Couldn't save that change. Check your connection.", 'error');
+  }
+  async function changePush(on: boolean) {
+    setPushBusy(true);
+    if (on) {
+      const r = await enablePush();
+      if (r.ok) { setPushOn(true); toast.show('Reminders are on for this device. You get one digest a morning, only when something is due.'); }
+      else toast.show(r.message, 'error');
+    } else if (await disablePush()) { setPushOn(false); toast.show('Push reminders are off for this device.'); }
+    else toast.show("Couldn't turn push off. Check your connection.", 'error');
+    setPushBusy(false);
+  }
+  async function changeEmail(on: boolean) {
+    if (!(await setEmailRemindersEnabled(on))) toast.show("Couldn't save that change. Check your connection.", 'error');
+    else toast.show(on ? `Email reminders on — they go to ${user?.email ?? 'your account email'}.` : 'Email reminders are off.');
   }
   async function saveQuizMix() {
     if (await setQuizMix(draftMix)) toast.show('Quiz mix saved. Your next daily quiz will use it.');
@@ -220,13 +239,32 @@ export function SettingsPage({ onNavigate }: SettingsPageProps) {
       </section>
 
       <section className="glass-card mb-4 p-5">
-        <div className="mb-4 flex items-center gap-3"><Bell size={18} className="text-[var(--accent-secondary)]" /><h2 className="font-display font-semibold text-[var(--text-primary)]">Nudges</h2></div>
+        <div className="mb-4 flex items-center gap-3"><Bell size={18} className="text-[var(--accent-secondary)]" /><h2 className="font-display font-semibold text-[var(--text-primary)]">Nudges &amp; reminders</h2></div>
         <div className="flex items-center justify-between gap-4">
           <div>
-            <p className="text-sm text-[var(--text-primary)]">Show nudges on Home</p>
-            <p className="text-xs text-[var(--text-secondary)]">Alora's in-app insights and gentle reminders about tasks, quizzes and habits. Push and email notifications aren't available yet.</p>
+            <p className="text-sm text-[var(--text-primary)]">Nudges and reminders</p>
+            <p className="text-xs text-[var(--text-secondary)]">The master switch. On: Alora shows insights on Home and may send the morning reminders below. Off: nothing is sent.</p>
           </div>
           <Toggle checked={notificationsEnabled} onChange={changeNotifications} label="Show nudges on Home" />
+        </div>
+        <div className="mt-3 flex items-center justify-between gap-4 rounded-xl border border-ink/10 bg-ink/[0.02] p-3">
+          <div>
+            <p className="text-sm text-[var(--text-primary)]">Push reminders on this device</p>
+            <p className="text-xs text-[var(--text-secondary)]">
+              {support === 'unsupported' && "This browser can't receive push. On iPhone, add Alora to your Home Screen first."}
+              {support === 'not-configured' && "Push isn't set up for this Alora yet."}
+              {support === 'denied' && 'Notifications are blocked for this site — allow them in your browser settings.'}
+              {support === 'ready' && 'One short morning digest of what is due today or overdue — nothing on days when nothing is due.'}
+            </p>
+          </div>
+          <Toggle checked={pushOn} onChange={changePush} disabled={!notificationsEnabled || pushBusy || (support !== 'ready' && !pushOn)} label="Push reminders on this device" />
+        </div>
+        <div className="mt-3 flex items-center justify-between gap-4 rounded-xl border border-ink/10 bg-ink/[0.02] p-3">
+          <div>
+            <p className="text-sm text-[var(--text-primary)]">Email reminders</p>
+            <p className="text-xs text-[var(--text-secondary)]">The same digest, sent to {user?.email ?? 'your account email'}.</p>
+          </div>
+          <Toggle checked={emailRemindersEnabled} onChange={changeEmail} disabled={!notificationsEnabled} label="Email reminders" />
         </div>
       </section>
 

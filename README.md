@@ -131,6 +131,46 @@ supabase secrets set GEMINI_API_KEY=...        # set by you; never committed
 
 The provider contract is the `AIProvider` interface in `src/lib/ai/types.ts`.
 
+## Reminders (push + email) and class audio
+
+Both run on Supabase edge functions and need a one-time setup. Run the migration
+`20261028120000_notifications_and_audio.sql` first (`supabase db push`).
+
+**Morning reminders** — `send-reminders` sends each student at most one digest a day (what is due today or overdue; nothing
+on quiet days) by web push and, if they opted in, email. Settings → *Nudges & reminders* controls it per student.
+
+```bash
+npx web-push generate-vapid-keys                      # prints a public and a private key
+supabase secrets set VAPID_PUBLIC_KEY=... VAPID_PRIVATE_KEY=... VAPID_SUBJECT=mailto:you@example.com
+supabase secrets set RESEND_API_KEY=... REMINDER_FROM_EMAIL="Alora <hello@your-domain>"   # email; the domain must be verified in Resend
+supabase secrets set CRON_SECRET=$(openssl rand -hex 24) APP_URL=https://your-deployed-app
+supabase functions deploy send-reminders --no-verify-jwt
+```
+
+Put the **public** key in the app's environment as `VITE_VAPID_PUBLIC_KEY` (Vercel → Settings → Environment Variables) and
+redeploy; without it the push switch says push isn't set up. Then schedule one daily call (e.g. 08:30 IST = `0 3 * * *` UTC)
+with the Supabase SQL editor:
+
+```sql
+select cron.schedule('alora-morning-reminders', '0 3 * * *', $$
+  select net.http_post(
+    url := 'https://<project-ref>.supabase.co/functions/v1/send-reminders',
+    headers := jsonb_build_object('x-cron-secret', '<the CRON_SECRET you set>'));
+$$);
+```
+
+(`pg_cron` and `pg_net` must be enabled under Database → Extensions.) iPhones only get web push after Alora is added to the Home Screen.
+
+**Class audio** — on a class (Academia → course → Classes) you can record or upload audio, play it back, and press
+*Transcribe*; *Add to class notes* appends the transcript to the class log and refreshes the class memory.
+Transcription uses the same `GEMINI_API_KEY`:
+
+```bash
+supabase functions deploy transcribe-audio
+```
+
+Recordings are converted to 16 kHz mono WAV in the browser (7-minute limit); uploaded files over 14 MB can be played but not transcribed.
+
 ## Testing
 
 There are three layers, all runnable without any real credentials:
@@ -158,7 +198,7 @@ Every page supports create / view / edit / delete where that makes sense, report
 
 Known limits:
 
-- Push and email notifications don't exist yet; the Settings toggle controls the in-app nudges on Home.
+- Push, email and audio transcription are tested against the in-memory stand-in only; the real push service, Resend and Gemini audio have to be exercised once with your keys (see *Reminders* above).
 - Playwright is not in `package.json`; the E2E suite needs it installed locally.
 
 ## License

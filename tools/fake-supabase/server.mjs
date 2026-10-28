@@ -395,6 +395,21 @@ function handleRest(req, res, table, url, bodyText, uid) {
 }
 
 // ------------------------------------------------------------- functions ---
+// Mirrors supabase/functions/transcribe-audio: runs as the caller, RLS-style ownership, audio only, size cap, saves the transcript.
+function handleTranscribeFunction(res, body, uid) {
+  if (config.functionsMode === 'missing') return send(res, 404, { code: 'NOT_FOUND', message: 'Requested function was not found' });
+  if (config.functionsMode === 'error') return send(res, 500, { error: 'The transcription service could not process that recording.' });
+  if (!uid) return send(res, 401, { error: 'Not signed in.' });
+  if (body?.healthCheck) return send(res, 200, { ok: true, geminiKeyConfigured: true });
+  const att = db.get('attachments').find((a) => a.id === body?.attachmentId && a.user_id === uid);
+  if (!att) return send(res, 404, { error: 'Recording not found.' });
+  if (!String(att.file_type).startsWith('audio/')) return send(res, 415, { error: 'That file is not audio.' });
+  if ((att.file_size ?? 0) > 14 * 1024 * 1024) return send(res, 413, { error: 'That recording is too large to transcribe (limit about 14 MB). Try a shorter clip.' });
+  att.transcript = `[fake-gemini] transcript of ${att.file_name}: today we covered photosynthesis and the Calvin cycle.`;
+  att.transcribed_at = new Date().toISOString();
+  return send(res, 200, { transcript: att.transcript });
+}
+
 function handleChatFunction(res, body, uid) {
   if (config.functionsMode === 'missing') return send(res, 404, { code: 'NOT_FOUND', message: 'Requested function was not found' });
   if (config.functionsMode === 'error') return send(res, 500, { error: 'injected function failure' });
@@ -532,6 +547,7 @@ const server = http.createServer(async (req, res) => {
     if (p === '/auth/v1/recover' && req.method === 'POST') { entry.recover = JSON.parse(bodyText || '{}').email; return send(res, 200, {}); }
 
     // ---- Edge Functions
+    if (p === '/functions/v1/transcribe-audio') return handleTranscribeFunction(res, JSON.parse(bodyText || '{}'), uid);
     if (p === '/functions/v1/alora-chat') return handleChatFunction(res, JSON.parse(bodyText || '{}'), uid);
 
     // ---- Storage

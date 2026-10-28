@@ -357,6 +357,7 @@ export interface Settings {
   hidden_nav_items: string[];
   theme_mode: 'light' | 'dark';
   notifications_enabled: boolean;
+  email_reminders_enabled: boolean;
   created_at: string;
   updated_at: string;
 }

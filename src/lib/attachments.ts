@@ -11,6 +11,9 @@ export interface Attachment {
   file_type: string;
   storage_path: string;
   file_size: number | null;
+  /** Set by the transcribe-audio function for audio files. */
+  transcript?: string | null;
+  transcribed_at?: string | null;
   created_at: string;
 }
 

@@ -1705,6 +1705,123 @@ await area('home', async (c) => {
 });
 
 // ======================================================== A11Y / TOUCH ====
+// ======================================================= REMINDERS & AUDIO ====
+await area('reminders', async (c) => {
+  const { page } = c;
+  await c.go('Settings'); await sleep(page, 500);
+  const email = page.getByRole('switch', { name: 'Email reminders' });
+  const push = page.getByRole('switch', { name: 'Push reminders on this device' });
+  const master = page.getByRole('switch', { name: 'Show nudges on Home' });
+  await check('reminders.push-honest-when-unconfigured', 'With no VAPID key, push says it is not set up and cannot be switched on', async () => {
+    await page.getByText("Push isn't set up for this Alora yet.").first().waitFor({ timeout: 4000 });
+    expect(await push.isDisabled(), 'the push switch should be disabled when push is not configured');
+    eq((await c.db('push_subscriptions')).length, 0, 'a subscription row appeared from nowhere');
+  });
+  await check('reminders.email-defaults-off-and-persists', 'Email reminders start off, save to the database, and survive reload', async () => {
+    eq(await email.getAttribute('aria-checked'), 'false', 'email reminders should be opt-in');
+    await email.click();
+    await until(async () => (await c.db('settings'))[0]?.email_reminders_enabled === true, 'email_reminders_enabled was not persisted');
+    await page.reload(); await c.go('Settings'); await sleep(page, 400);
+    eq(await page.getByRole('switch', { name: 'Email reminders' }).getAttribute('aria-checked'), 'true', 'email switch after reload');
+    await page.getByText(/sent to reminders@example\.test|The same digest, sent to/).first().waitFor({ timeout: 3000 });
+  });
+  await check('reminders.email-failure-reverts', 'A failed save puts the switch back and says so', async () => {
+    await api('/__fake/faults', [{ table: 'settings', method: 'POST', status: 500, times: 1 }]);
+    const sw = page.getByRole('switch', { name: 'Email reminders' });
+    const before = await sw.getAttribute('aria-checked');
+    await sw.click();
+    await page.getByText(/Couldn't save/i).first().waitFor({ timeout: 6000 });
+    await until(async () => (await sw.getAttribute('aria-checked')) === before, 'switch stayed in the wrong state after the failed save');
+    await api('/__fake/faults', { clear: true });
+  });
+  await check('reminders.master-switch-gates-channels', 'Turning nudges off disables the push and email switches', async () => {
+    await master.click(); await sleep(page, 600);
+    expect(await page.getByRole('switch', { name: 'Email reminders' }).isDisabled(), 'email switch still usable with the master switch off');
+    await page.getByRole('switch', { name: 'Show nudges on Home' }).click(); await sleep(page, 600);
+    expect(!(await page.getByRole('switch', { name: 'Email reminders' }).isDisabled()), 'email switch should come back with the master switch');
+  });
+  await check('reminders.service-worker-served', 'The push service worker is served and handles push + click', async () => {
+    const r = await page.request.get(`${APP}/sw.js`);
+    eq(r.status(), 200, 'sw.js status');
+    const body = await r.text();
+    expect(/addEventListener\('push'/.test(body) && /notificationclick/.test(body), 'sw.js does not handle push / notificationclick');
+  });
+});
+
+await area('audio', async (c) => {
+  const { page } = c;
+  const fx = await seedAcademic(c);
+  await page.reload(); await c.go('Academia'); await sleep(page, 800);
+  await page.getByRole('button', { name: /Structure/ }).click();
+  await page.getByText('Year 1').first().waitFor();
+  for (const label of ['Year 1', 'Semester 1']) {
+    if (await page.getByText('Linear Algebra', { exact: true }).first().isVisible()) break;
+    await page.getByText(label, { exact: true }).first().click(); await sleep(page, 250);
+  }
+  await page.getByText('Linear Algebra', { exact: true }).first().click(); await sleep(page, 400);
+  await page.getByRole('button', { name: 'Classes', exact: true }).click(); await sleep(page, 400);
+  const fileInput = () => page.locator('input[type=file]:not([webkitdirectory])').first();
+  const mp3 = Buffer.from('ID3-fake-audio');
+
+  await check('audio.upload-shows-player', 'An uploaded recording appears with a player and a Transcribe button (no transcript invented)', async () => {
+    await fileInput().setInputFiles({ name: 'lecture3.mp3', mimeType: 'audio/mpeg', buffer: mp3 });
+    await page.getByRole('button', { name: 'Transcribe' }).waitFor({ timeout: 6000 });
+    await page.locator('audio').waitFor({ timeout: 5000 }).catch(() => { throw new Fail('no audio player'); });
+    const rows = await c.db('attachments');
+    eq(rows.length, 1, 'attachment row'); eq(rows[0].file_type, 'audio/mpeg', 'file type'); expect(!rows[0].transcript, 'a transcript existed before anyone asked for one');
+  });
+  await check('audio.transcribe-failure-is-honest', 'If transcription fails the student is told, nothing is saved, and they can retry', async () => {
+    await api('/__fake/config', { functionsMode: 'error' });
+    await page.getByRole('button', { name: 'Transcribe' }).click();
+    await page.getByRole('alert').filter({ hasText: /transcription service/i }).waitFor({ timeout: 6000 });
+    expect(!(await c.db('attachments'))[0].transcript, 'a transcript was saved despite the failure');
+    await api('/__fake/config', { functionsMode: 'ok' });
+  });
+  await check('audio.transcribe-saves', 'Transcribe stores the transcript on the recording and shows it', async () => {
+    await page.getByRole('button', { name: 'Transcribe' }).click();
+    await page.getByText(/transcript of lecture3\.mp3/).first().waitFor({ timeout: 6000 });
+    expect(/photosynthesis/.test((await c.db('attachments'))[0].transcript || ''), 'transcript not persisted on the attachment');
+    await page.reload(); await sleep(page, 600);
+  });
+  await check('audio.add-to-class-notes-feeds-brain', 'Adding the transcript to class notes updates the log and the class memory — once, even if pressed twice', async () => {
+    // reopen after reload
+    await page.getByRole('button', { name: /Structure/ }).click();
+    for (const label of ['Year 1', 'Semester 1']) {
+      if (await page.getByText('Linear Algebra', { exact: true }).first().isVisible()) break;
+      await page.getByText(label, { exact: true }).first().click(); await sleep(page, 250);
+    }
+    await page.getByText('Linear Algebra', { exact: true }).first().click(); await sleep(page, 400);
+    await page.getByRole('button', { name: 'Classes', exact: true }).click(); await sleep(page, 500);
+    await page.getByText(/transcript of lecture3\.mp3/).first().waitFor({ timeout: 6000 }); // survives reload
+    await page.getByRole('button', { name: 'Add to class notes' }).click();
+    await until(async () => /Calvin cycle/.test((await c.db('class_logs'))[0]?.raw_thoughts || ''), 'transcript was not appended to the class log');
+    const log = (await c.db('class_logs'))[0];
+    expect(/Eigenvectors keep their direction/.test(log.raw_thoughts), "the student's original notes were lost");
+    await sleep(page, 600);
+    await page.getByRole('button', { name: 'Add to class notes' }).click(); await sleep(page, 900);
+    eq(((await c.db('class_logs'))[0].raw_thoughts.match(/Calvin cycle/g) || []).length, 1, 'transcript was appended twice');
+    eq((await c.db('memories')).filter((m) => m.source === 'class').length, 1, 'class memory should be one refreshed memory, not duplicates');
+  });
+  await check('audio.too-large-explains', 'A recording over 14 MB says it is too large to transcribe instead of failing', async () => {
+    await c.patch('attachments', { id: (await c.db('attachments'))[0].id }, { transcript: null, file_size: 20 * 1024 * 1024 });
+    await page.reload(); await sleep(page, 600);
+    await page.getByRole('button', { name: /Structure/ }).click();
+    for (const label of ['Year 1', 'Semester 1']) {
+      if (await page.getByText('Linear Algebra', { exact: true }).first().isVisible()) break;
+      await page.getByText(label, { exact: true }).first().click(); await sleep(page, 250);
+    }
+    await page.getByText('Linear Algebra', { exact: true }).first().click(); await sleep(page, 400);
+    await page.getByRole('button', { name: 'Classes', exact: true }).click(); await sleep(page, 500);
+    await page.getByText(/too large to transcribe/i).first().waitFor({ timeout: 5000 });
+    eq(await page.getByRole('button', { name: 'Transcribe' }).count(), 0, 'Transcribe offered for a file that cannot be transcribed');
+  });
+  await check('audio.remove', 'A recording can be removed', async () => {
+    await page.locator('audio').hover();
+    await page.getByRole('button', { name: /^Remove lecture3\.mp3/ }).click();
+    await until(async () => (await c.db('attachments')).length === 0, 'attachment row not deleted');
+  });
+});
+
 await area('a11y', async (c) => {
   const { page } = c;
   await c.seed('tasks', [{ title: 'A11y probe task', priority: 'low', deadline: new Date(Date.now() + 3600e3).toISOString() }]);
