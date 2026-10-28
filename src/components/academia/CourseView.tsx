@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/lib/toast';
 import type { AcademicData } from '@/lib/academic';
-import type { Topic, TopicStatus } from '@/lib/types';
+import type { Topic, TopicStatus, ClassSession } from '@/lib/types';
 import { EmptyState, ProgressBar, PopoverMenu } from '@/components/ui';
 import { ConfirmModal } from '@/components/Modal';
 import {
@@ -10,7 +10,7 @@ import {
   type EditModalData, type DeleteTarget, LogClassModal,
 } from '@/components/academia/AcademiaHierarchy';
 import { levelTable, countDeps, classIdsUnder, type Level } from '@/components/academia/hierarchy';
-import { cascadeClassDeletion } from '@/lib/brain';
+import { cascadeClassDeletion, cascadeClassEdit } from '@/lib/brain';
 import { AttachmentList } from '@/components/AttachmentList';
 import { AskAlora } from '@/components/AskAlora';
 import { ArrowLeft, BookOpen, FileText, Brain, Clock, AlertTriangle, TrendingUp, GraduationCap, CheckCircle2, Plus, Pencil, Trash2 } from 'lucide-react';
@@ -53,6 +53,27 @@ export function CourseView({ courseId, data, onBack, reload }: Props) {
         <EmptyState icon={<BookOpen size={28} className="text-[var(--text-secondary)]" />} title="Course not found" message="This course may have been deleted." action={<button onClick={onBack} className="btn-primary px-5 py-2.5 text-sm">Back</button>} />
       </div>
     );
+  }
+
+  /** Appends a recording's transcript to this class's notes, then refreshes what the brain remembers from the class. Safe to press twice. */
+  async function addTranscriptToClass(c: ClassSession, transcript: string): Promise<boolean> {
+    const log = data.classLogs.find((l) => l.class_id === c.id);
+    const block = `Transcript:\n${transcript.trim()}`;
+    const current = log?.raw_thoughts ?? '';
+    if (current.includes(transcript.trim())) return true;
+    const rawThoughts = current.trim() ? `${current.trim()}\n\n${block}` : block;
+    const { error } = log
+      ? await supabase.from('class_logs').update({ raw_thoughts: rawThoughts }).eq('id', log.id)
+      : await supabase.from('class_logs').insert({ class_id: c.id, raw_thoughts: rawThoughts });
+    if (error) return false;
+    const topic = data.topics.find((t) => t.id === c.topic_id) || null;
+    await cascadeClassEdit({
+      classId: c.id, courseId: course!.id, courseName: course!.name, topic: topic && { id: topic.id, name: topic.name, status: topic.status, review_count: topic.review_count },
+      title: c.title, rawThoughts, understanding: log?.understanding_rating ?? 3,
+      questions: log?.questions ?? [], confusions: log?.confusions ?? [], learnings: log?.learnings ?? [],
+    });
+    await reload();
+    return true;
   }
 
   const semester = data.semesters.find((s) => s.id === course.semester_id);
@@ -231,7 +252,7 @@ export function CourseView({ courseId, data, onBack, reload }: Props) {
                 <p className="text-xs text-[var(--text-secondary)]">{new Date(c.session_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}{topic ? ` · ${topic.name}` : ''}{log ? ` · Understanding: ${log.understanding_rating}/5` : ''}</p>
                 {log && log.raw_thoughts && <p className="mt-2 rounded-lg border border-ink/8 bg-ink/[0.02] px-3 py-2 text-xs text-[var(--text-secondary)]">{log.raw_thoughts}</p>}
                 <div className="mt-3">
-                  <AttachmentList entityType="class" entityId={c.id} />
+                  <AttachmentList entityType="class" entityId={c.id} allowRecording onUseTranscript={(text) => addTranscriptToClass(c, text)} />
                 </div>
               </div>
             );})

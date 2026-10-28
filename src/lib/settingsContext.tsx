@@ -26,6 +26,7 @@ interface SettingsContextValue {
   hiddenNavItems: string[];
   themeMode: ThemeMode;
   notificationsEnabled: boolean;
+  emailRemindersEnabled: boolean;
   quizMix: QuizMix;
   loading: boolean;
   /** Every setter applies instantly, then reverts and resolves `false` if the save fails. */
@@ -33,6 +34,7 @@ interface SettingsContextValue {
   toggleNavItem: (id: string, visible: boolean) => Promise<boolean>;
   setThemeMode: (mode: ThemeMode) => Promise<boolean>;
   setNotificationsEnabled: (enabled: boolean) => Promise<boolean>;
+  setEmailRemindersEnabled: (enabled: boolean) => Promise<boolean>;
   setQuizMix: (mix: QuizMix) => Promise<boolean>;
 }
 
@@ -43,6 +45,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const [hiddenNavItems, setHiddenNavItemsState] = useState<string[]>([]);
   const [themeMode, setThemeModeState] = useState<ThemeMode>(readCachedTheme);
   const [notificationsEnabled, setNotificationsState] = useState(true);
+  const [emailRemindersEnabled, setEmailRemindersState] = useState(false);
   const [quizMix, setQuizMixState] = useState<QuizMix>(DEFAULT_QUIZ_MIX);
   const [loading, setLoading] = useState(true);
 
@@ -56,7 +59,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     }
     const { data, error } = await supabase
       .from('settings')
-      .select('hidden_nav_items, theme_mode, notifications_enabled, quiz_mix')
+      .select('hidden_nav_items, theme_mode, notifications_enabled, email_reminders_enabled, quiz_mix')
       .maybeSingle();
     // On a failed read keep what we have (cached theme, defaults) instead of
     // silently resetting the user's choices.
@@ -64,6 +67,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       setHiddenNavItemsState((data?.hidden_nav_items as string[] | undefined) || []);
       if (data?.theme_mode) setThemeModeState(data.theme_mode as ThemeMode);
       setNotificationsState(data?.notifications_enabled ?? true);
+      setEmailRemindersState(data?.email_reminders_enabled ?? false);
       setQuizMixState(normalizeMix(data?.quiz_mix));
     } else {
       console.warn('[settings] could not load settings:', error.message);
@@ -113,6 +117,14 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     return ok;
   }, [notificationsEnabled, persist]);
 
+  const setEmailRemindersEnabled = useCallback(async (enabled: boolean) => {
+    const prev = emailRemindersEnabled;
+    setEmailRemindersState(enabled);
+    const ok = await persist({ email_reminders_enabled: enabled });
+    if (!ok) setEmailRemindersState(prev);
+    return ok;
+  }, [emailRemindersEnabled, persist]);
+
   const setQuizMix = useCallback(async (mix: QuizMix) => {
     const prev = quizMix;
     const clean = normalizeMix(mix);
@@ -123,9 +135,9 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   }, [quizMix, persist]);
 
   const value = useMemo(() => ({
-    hiddenNavItems, themeMode, notificationsEnabled, quizMix, loading,
-    setHiddenNavItems, toggleNavItem, setThemeMode, setNotificationsEnabled, setQuizMix,
-  }), [hiddenNavItems, themeMode, notificationsEnabled, quizMix, loading, setHiddenNavItems, toggleNavItem, setThemeMode, setNotificationsEnabled, setQuizMix]);
+    hiddenNavItems, themeMode, notificationsEnabled, emailRemindersEnabled, quizMix, loading,
+    setHiddenNavItems, toggleNavItem, setThemeMode, setNotificationsEnabled, setEmailRemindersEnabled, setQuizMix,
+  }), [hiddenNavItems, themeMode, notificationsEnabled, emailRemindersEnabled, quizMix, loading, setHiddenNavItems, toggleNavItem, setThemeMode, setNotificationsEnabled, setEmailRemindersEnabled, setQuizMix]);
 
   return <SettingsContext.Provider value={value}>{children}</SettingsContext.Provider>;
 }
