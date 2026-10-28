@@ -110,6 +110,7 @@ await area('auth', { noAuth: true }, async (c) => {
   });
   await check('auth.labels', 'Form inputs have associated labels + autocomplete', async () => {
     await page.goto(APP);
+    await page.getByPlaceholder('you@example.com').waitFor({ timeout: 10000 });
     expect(await page.getByLabel('Email').count() === 1, 'Email input is not reachable via its <label>');
     const ac = await page.getByPlaceholder('you@example.com').getAttribute('autocomplete');
     expect(!!ac, 'email input has no autocomplete attribute (password managers)');
