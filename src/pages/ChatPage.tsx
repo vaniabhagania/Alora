@@ -58,6 +58,7 @@ export function ChatPage() {
   const [booting, setBooting] = useState(true);
   const [bootError, setBootError] = useState(false);
   const [navSuggestion, setNavSuggestion] = useState<NavIntent | null>(null);
+  const [attaching, setAttaching] = useState(false);
   const [attachedFile, setAttachedFile] = useState<{ previewUrl: string | null; mimeType: string; base64: string; name: string; readable: boolean } | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
@@ -198,8 +199,11 @@ export function ChatPage() {
 
     let base64 = '';
     if (readable) {
+      // Sending while the file is still being read would drop it silently — handleSend waits on `attaching`.
+      setAttaching(true);
       try { base64 = await fileToBase64(file); }
       catch { toast.show("Couldn't read that file. Try another.", 'error'); return; }
+      finally { setAttaching(false); }
     }
     setAttachedFile((prev) => {
       if (prev?.previewUrl) URL.revokeObjectURL(prev.previewUrl);
@@ -229,7 +233,7 @@ export function ChatPage() {
   }
 
   function handleSend() {
-    if ((!input.trim() && !attachedFile) || thinking || booting) return;
+    if ((!input.trim() && !attachedFile) || thinking || booting || attaching) return;
     const unreadableNote = attachedFile && !attachedFile.readable
       ? `[Attached "${attachedFile.name}" — I can't read this file's content directly (only images and PDFs), but wanted you to know it was attached.]`
       : '';
@@ -438,7 +442,7 @@ export function ChatPage() {
             />
             {speech.isListening && <p className="mt-1 text-xs text-[var(--text-secondary)]">Listening... tap the mic again to stop.</p>}
           </div>
-          <button onClick={handleSend} disabled={(!input.trim() && !attachedFile) || thinking || booting} aria-label="Send message" className="btn-primary flex h-11 w-11 shrink-0 items-center justify-center">
+          <button onClick={handleSend} disabled={(!input.trim() && !attachedFile) || thinking || booting || attaching} aria-label="Send message" className="btn-primary flex h-11 w-11 shrink-0 items-center justify-center">
             <Send size={18} />
           </button>
         </div>

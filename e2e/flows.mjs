@@ -624,6 +624,7 @@ await area('chat', async (c) => {
     await page.getByRole('button', { name: 'New chat' }).click();
     const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
     await page.locator('input[type=file]').setInputFiles({ name: 'diagram.png', mimeType: 'image/png', buffer: png });
+    await page.getByText('Image attached — Alora can read this.').waitFor({ timeout: 6000 });
     await send('What is in this picture?');
     await page.getByText('I received: What is in this picture?').waitFor({ timeout: 9000 });
     await send('Thanks, and what next?');
